@@ -28,14 +28,14 @@ repos:
         files: ^custom_components/
       - id: pyright
         name: pyright (type check)
-        entry: uv run pyright
+        entry: uv run --group test pyright
         language: system
         stages: [pre-push]
         pass_filenames: false
         types: [python]
       - id: pytest-unit
         name: pytest (unit tests)
-        entry: uv run pytest tests/ -m "not integration" -q --tb=short
+        entry: uv run --group test pytest tests/ -m "not integration" -q --tb=short
         language: system
         stages: [pre-push]
         pass_filenames: false
