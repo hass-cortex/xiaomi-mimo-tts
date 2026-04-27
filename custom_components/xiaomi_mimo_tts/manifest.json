@@ -1,0 +1,14 @@
+{
+  "domain": "xiaomi_mimo_tts",
+  "name": "Xiaomi MiMo TTS",
+  "codeowners": ["@parkghost"],
+  "config_flow": true,
+  "dependencies": ["file_upload"],
+  "documentation": "https://github.com/hass-cortex/xiaomi-mimo-tts",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/hass-cortex/xiaomi-mimo-tts/issues",
+  "quality_scale": "platinum",
+  "requirements": [],
+  "version": "0.1.0"
+}

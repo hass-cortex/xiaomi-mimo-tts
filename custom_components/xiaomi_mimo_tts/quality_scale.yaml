@@ -1,0 +1,70 @@
+rules:
+  # Bronze
+  config-flow: done
+  config-flow-test-coverage: done
+  test-before-configure: done
+  test-before-setup:
+    status: done
+    comment: validate() runs in the user step (free GET /v1/models)
+  unique-config-entry: done
+  runtime-data: done
+  has-entity-name: done
+  entity-unique-id: done
+  entity-event-setup: done
+  dependency-transparency: done
+  appropriate-polling:
+    status: exempt
+    comment: TTS is push-based; no polling occurs
+  action-setup:
+    status: exempt
+    comment: No yaml-level service registered
+  brands: done
+  common-modules: done
+  docs-actions: done
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+
+  # Silver
+  config-entry-unloading: done
+  reauthentication-flow: done
+  parallel-updates: done
+  entity-unavailable: done
+  action-exceptions: done
+  log-when-unavailable: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  integration-owner: done
+  test-coverage: done
+
+  # Gold
+  devices: done
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default: done
+  entity-translations: done
+  exception-translations: done
+  icon-translations: done
+  reconfiguration-flow: done
+  repair-issues: done
+  diagnostics: done
+  dynamic-devices: done
+  stale-devices: done
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  discovery:
+    status: exempt
+    comment: Cloud API; no LAN discovery
+  discovery-update-info:
+    status: exempt
+    comment: Cloud API; no discovery
+
+  # Platinum
+  async-dependency: done
+  inject-websession: done
+  strict-typing: done

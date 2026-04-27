@@ -1,0 +1,217 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Xiaomi MiMo TTS",
+        "description": "Enter your Xiaomi MiMo API key from platform.xiaomimimo.com.",
+        "data": {
+          "api_key": "API key",
+          "name": "Display name (optional)"
+        },
+        "data_description": {
+          "name": "Used to distinguish multiple Xiaomi MiMo accounts. Defaults to \"Xiaomi MiMo TTS\" if left blank."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Xiaomi MiMo TTS",
+        "description": "Your Xiaomi MiMo API key was rejected. Enter a new key.",
+        "data": {
+          "api_key": "API key"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Xiaomi MiMo TTS",
+        "data": {
+          "name": "Display name",
+          "base_url": "Base URL",
+          "request_timeout": "Request timeout (seconds)"
+        },
+        "data_description": {
+          "name": "Rename this account. Leave unchanged to keep the current name."
+        }
+      }
+    },
+    "error": {
+      "invalid_api_key": "Invalid API key.",
+      "cannot_connect": "Cannot connect to Xiaomi MiMo API.",
+      "unknown": "Unknown error. Check the log."
+    },
+    "abort": {
+      "already_configured": "This API key is already configured.",
+      "reauth_successful": "Re-authentication was successful.",
+      "reconfigure_successful": "Configuration updated."
+    }
+  },
+  "config_subentries": {
+    "built_in": {
+      "entry_type": "Built-in voice",
+      "initiate_flow": {
+        "user": "Add built-in voice"
+      },
+      "step": {
+        "user": {
+          "title": "Built-in voice",
+          "data": {
+            "name": "Profile name",
+            "voice": "Voice",
+            "default_style_prompt": "Default style prompt (optional)"
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure built-in voice",
+          "data": {
+            "name": "Profile name",
+            "voice": "Voice",
+            "default_style_prompt": "Default style prompt (optional)"
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Voice profile updated."
+      }
+    },
+    "voice_design": {
+      "entry_type": "Designed voice",
+      "initiate_flow": {
+        "user": "Add designed voice"
+      },
+      "step": {
+        "user": {
+          "title": "Voice design",
+          "description": "Describe the voice in natural language; Xiaomi MiMo will synthesize it.",
+          "data": {
+            "name": "Profile name",
+            "voice_description": "Voice description"
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure designed voice",
+          "data": {
+            "name": "Profile name",
+            "voice_description": "Voice description"
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Voice profile updated."
+      }
+    },
+    "voice_clone": {
+      "entry_type": "Cloned voice",
+      "initiate_flow": {
+        "user": "Add cloned voice"
+      },
+      "step": {
+        "user": {
+          "title": "Voice clone",
+          "description": "Provide an audio sample to clone.",
+          "data": {
+            "name": "Profile name",
+            "sample_source": "Sample source"
+          }
+        },
+        "upload": {
+          "title": "Upload audio sample",
+          "description": "Optionally name the file. Leave blank for an auto-generated clone_xxxx name.",
+          "data": {
+            "audio_file": "Audio file (mp3 or wav, max 10 MB)",
+            "save_as": "Save as (optional, e.g. alice)"
+          }
+        },
+        "pick": {
+          "title": "Pick existing sample",
+          "data": {
+            "voice_sample_id": "Sample"
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure cloned voice",
+          "data": {
+            "name": "Profile name",
+            "sample_source": "Sample source"
+          }
+        }
+      },
+      "abort": {
+        "no_samples_found": "No voice samples found in /media/voice_samples.",
+        "reconfigure_successful": "Voice profile updated."
+      },
+      "error": {
+        "invalid_sample": "Invalid audio sample."
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Xiaomi MiMo TTS options",
+        "data": {
+          "request_timeout": "Request timeout (seconds)",
+          "streaming_enabled": "Enable streaming",
+          "voice_samples_dir": "Voice samples directory",
+          "default_audio_format": "Default audio format"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "voice_in_use": {"name": "Voice"},
+      "requests_total": {"name": "Requests total"},
+      "requests_success": {"name": "Requests success"},
+      "requests_failed": {"name": "Requests failed"},
+      "last_duration": {"name": "Last duration"},
+      "average_duration": {"name": "Average duration"},
+      "last_audio_size": {"name": "Last audio size"},
+      "last_audio_seconds": {"name": "Last audio seconds"},
+      "total_audio_minutes": {"name": "Total audio minutes"},
+      "last_text_chars": {"name": "Last text characters"},
+      "total_chars_synthesized": {"name": "Total characters synthesized"},
+      "last_result": {
+        "name": "Last result",
+        "state": {
+          "success": "Success",
+          "api_error": "API error",
+          "auth_error": "Authentication error",
+          "timeout": "Timeout"
+        }
+      },
+      "last_text": {"name": "Last text"},
+      "last_ttft": {"name": "Last TTFT"},
+      "last_streaming": {"name": "Streaming"},
+      "last_sentence_count": {"name": "Last sentence count"}
+    }
+  },
+  "issues": {
+    "voice_sample_missing": {
+      "title": "Voice sample missing",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Restore voice sample for {profile_name}",
+            "description": "The sample at {missing_path} could not be found. Pick a new one or upload."
+          }
+        }
+      }
+    },
+    "model_unavailable": {
+      "title": "Model unavailable for {profile_name}",
+      "description": "Your Xiaomi MiMo account cannot access {model_id}. Visit platform.xiaomimimo.com to enable beta access."
+    },
+    "quota_exceeded": {
+      "title": "Xiaomi MiMo quota exceeded",
+      "description": "Top up at platform.xiaomimimo.com."
+    },
+    "media_dir_unwritable": {
+      "title": "Voice samples directory unwritable",
+      "description": "Cannot write to {dir_path}. Adjust the option or fix permissions."
+    }
+  },
+  "selector": {
+    "voice": {
+      "options": {
+        "mimo_default": "Default (auto)"
+      }
+    }
+  }
+}

@@ -1,0 +1,97 @@
+[project]
+name = "xiaomi-mimo-tts"
+version = "0.1.0"
+description = "Home Assistant TTS integration for Xiaomi MiMo TTS v2.5"
+readme = "README.md"
+requires-python = ">=3.14"
+license = {text = "MIT"}
+authors = [{name = "parkghost", email = "parkghost@gmail.com"}]
+keywords = ["home-assistant", "tts", "text-to-speech", "xiaomi", "mimo", "voice"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Home Automation",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
+dependencies = ["sentence-stream>=1.2.1,<2"]
+
+[build-system]
+requires = ["setuptools>=82.0.1"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["custom_components*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+markers = ["integration: Integration tests requiring Xiaomi MiMo API key"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "ASYNC", "B", "SIM", "RUF013"]
+ignore = ["E501", "B008", "SIM108"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["custom_components.xiaomi_mimo_tts"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
+
+[tool.pyright]
+pythonVersion = "3.14"
+venvPath = "."
+venv = ".venv"
+include = ["custom_components"]
+exclude = ["tests", "**/__pycache__"]
+typeCheckingMode = "standard"
+useLibraryCodeForTypes = true
+# homeassistant is not installed in this repo (mocked in tests); suppress missing-import noise
+reportMissingImports = "none"
+reportMissingTypeStubs = "none"
+
+[tool.coverage.run]
+source = ["custom_components"]
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.commitizen]
+version = "0.1.0"
+version_files = [
+    "pyproject.toml:version",
+    "custom_components/xiaomi_mimo_tts/manifest.json:version",
+]
+tag_format = "$version"
+annotated_tag = true
+update_changelog_on_bump = false
+pre_bump_hooks = ["uv lock", "git add uv.lock"]
+major_version_zero = true
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.11",
+    "pyright>=1.1.390",
+    "commitizen>=4.0",
+    "pre-commit>=4.0",
+    "pytest-mock>=3.15.1",
+]
+test = ["pytest>=9.0.3", "pytest-asyncio>=1.3.0", "pytest-aiohttp>=1.1.0", "pytest-cov>=7.1.0", "aioresponses>=0.7.8", "voluptuous>=0.13.0"]

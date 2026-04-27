@@ -1,0 +1,29 @@
+{
+  "entity": {
+    "sensor": {
+      "requests_total": {"default": "mdi:counter"},
+      "requests_success": {"default": "mdi:check-circle"},
+      "requests_failed": {"default": "mdi:alert-circle"},
+      "last_duration": {"default": "mdi:timer-outline"},
+      "average_duration": {"default": "mdi:timer-sand"},
+      "last_audio_size": {"default": "mdi:file-music"},
+      "last_audio_seconds": {"default": "mdi:clock-fast"},
+      "total_audio_minutes": {"default": "mdi:clock-outline"},
+      "last_text_chars": {"default": "mdi:format-letter-case"},
+      "total_chars_synthesized": {"default": "mdi:counter"},
+      "last_result": {
+        "default": "mdi:check-decagram",
+        "state": {
+          "success": "mdi:check-circle",
+          "api_error": "mdi:alert-circle",
+          "auth_error": "mdi:lock-alert",
+          "timeout": "mdi:timer-alert"
+        }
+      },
+      "last_text": {"default": "mdi:text"},
+      "last_ttft": {"default": "mdi:speedometer"},
+      "last_streaming": {"default": "mdi:transit-connection-variant"},
+      "last_sentence_count": {"default": "mdi:format-paragraph"}
+    }
+  }
+}
