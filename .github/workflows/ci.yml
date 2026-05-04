@@ -56,7 +56,6 @@ jobs:
           --cov=custom_components
           --cov-report=xml:coverage.xml
           --cov-report=term-missing
-          -m "not integration"
           -v
       - name: Upload coverage
         if: always()

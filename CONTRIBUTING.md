@@ -89,7 +89,6 @@ xiaomi-mimo-tts/
   tests/
     engine/              # Pure engine tests — no HA mocking
     unit/                # HA-coupled tests — sys.modules mock
-    integration/         # Real API tests (gated on MIMO_API_KEY env var)
   pyproject.toml         # Project metadata and tool config
 ```
 

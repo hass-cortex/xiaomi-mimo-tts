@@ -32,7 +32,6 @@ pythonpath = ["."]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-markers = ["integration: Integration tests requiring Xiaomi MiMo API key"]
 
 [tool.ruff]
 target-version = "py314"

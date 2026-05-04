@@ -77,7 +77,6 @@ uv run cz bump --prerelease beta           # Version bump for beta release
 
 - **`tests/engine/`** — pure tests against the HA-decoupled engine. `tests/engine/conftest.py` adds `aiohttp_session` + `aioresponses` fixtures only; no HA mocking.
 - **`tests/unit/`** — HA-mocked tests for shell modules. `tests/conftest.py` (root) injects mock `homeassistant.*` into `sys.modules` before any test imports.
-- **`tests/integration/test_real_api.py`** — gated on `MIMO_API_KEY` env var; calls real Xiaomi MiMo API. Skipped in CI.
 - Coverage threshold: 70% (`fail_under` in pyproject.toml). Current actual: ~82%.
 
 ## Conventions

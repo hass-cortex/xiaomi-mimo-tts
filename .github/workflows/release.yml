@@ -19,7 +19,7 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen --group dev --group test
       - run: uv run ruff check .
-      - run: uv run pytest -m "not integration" -v
+      - run: uv run pytest -v
 
   release:
     name: Create GitHub Release
