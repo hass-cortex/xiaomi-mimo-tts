@@ -408,7 +408,11 @@ class XiaomiMimoTTSConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         api_key = user_input[CONF_API_KEY]
         error = await _validate_api_key(self.hass, api_key)
         if error is None:
-            return self.async_update_reload_and_abort(
+            # Non-auto-reload variant: the entry's update listener
+            # (_async_update_listener) fires on data change and reloads. Keeping
+            # the listener as the single reload source avoids a redundant
+            # double-scheduled reload and is also required for subentry edits.
+            return self.async_update_and_abort(
                 self._reauth_entry, data={CONF_API_KEY: api_key}
             )
         return self.async_show_form(
@@ -442,7 +446,10 @@ class XiaomiMimoTTSConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             )
             return self.async_show_form(step_id="reconfigure", data_schema=schema)
         new_title = (user_input.pop(CONF_NAME, None) or "").strip() or entry.title
-        return self.async_update_reload_and_abort(
+        # Non-auto-reload variant: the entry's update listener handles the
+        # reload when data/options change (single reload source; also covers
+        # subentry edits, which async_update_and_abort does not auto-reload).
+        return self.async_update_and_abort(
             entry,
             title=new_title,
             options={**entry.options, **user_input},

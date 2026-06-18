@@ -128,6 +128,12 @@ class _MockConfigFlow:
             "reason": kwargs.get("reason", "reconfigure_successful"),
         }
 
+    def async_update_and_abort(self, entry: object, **kwargs: object) -> dict:
+        return {
+            "type": "abort",
+            "reason": kwargs.get("reason", "reconfigure_successful"),
+        }
+
     def _get_reconfigure_entry(self) -> MagicMock:
         entry = MagicMock()
         entry.data = {}

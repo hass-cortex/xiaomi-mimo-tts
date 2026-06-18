@@ -197,7 +197,7 @@ async def test_reauth_step_updates_entry(mock_hass) -> None:
     flow = XiaomiMimoTTSConfigFlow()
     flow.hass = mock_hass
     flow.async_show_form = MagicMock()
-    flow.async_update_reload_and_abort = MagicMock(return_value={"type": "abort"})
+    flow.async_update_and_abort = MagicMock(return_value={"type": "abort"})
     flow._reauth_entry = MagicMock(entry_id="entry_test", data={"api_key": "old"})
 
     with (
@@ -217,7 +217,7 @@ async def test_reauth_step_updates_entry(mock_hass) -> None:
         )
         await flow.async_step_reauth_confirm({"api_key": "new-key"})
 
-    flow.async_update_reload_and_abort.assert_called_once()
+    flow.async_update_and_abort.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -227,7 +227,7 @@ async def test_reauth_step_invalid_key_shows_error(mock_hass) -> None:
     flow = XiaomiMimoTTSConfigFlow()
     flow.hass = mock_hass
     flow.async_show_form = MagicMock(return_value={"type": "form"})
-    flow.async_update_reload_and_abort = MagicMock()
+    flow.async_update_and_abort = MagicMock()
     flow._reauth_entry = MagicMock(entry_id="entry_test", data={"api_key": "old"})
 
     with (
