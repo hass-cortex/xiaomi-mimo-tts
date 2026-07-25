@@ -4,7 +4,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-blue.svg)](https://hacs.xyz/)
 [![HA Version](https://img.shields.io/badge/HA-2026.3.0+-green.svg)](https://www.home-assistant.io/)
 [![GitHub License](https://img.shields.io/github/license/hass-cortex/xiaomi-mimo-tts)](https://github.com/hass-cortex/xiaomi-mimo-tts/blob/main/LICENSE)
-[![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/hass-cortex/xiaomi-mimo-tts)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/hass-cortex/xiaomi-mimo-tts)
 
 A Home Assistant custom integration providing cloud-based text-to-speech via the [Xiaomi MiMo TTS v2.5 API](https://platform.xiaomimimo.com), with built-in voices, natural-language voice design, and voice cloning from audio samples.
 
