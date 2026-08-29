@@ -9,12 +9,10 @@
 A Home Assistant custom integration providing cloud-based text-to-speech via the [Xiaomi MiMo TTS v2.5 API](https://platform.xiaomimimo.com), with built-in voices, natural-language voice design, and voice cloning from audio samples.
 
 ```
-Reply text ──► Xiaomi MiMo API ──► Streaming Audio ──► Media player
-   (whole)          ▲                (as inferred)
+Reply text ──► Xiaomi MiMo API ──► Audio ──► Media player
+   (whole)          ▲          (streamed on built-in voices)
                 voice profile
 ```
-
-With a built-in voice the API emits audio while it is still inferring, so playback starts on the first chunk rather than after the whole clip, and the wait does not grow with the length of the reply. Voice design and voice clone profiles do not advertise streaming: the API returns their audio in one piece, and faking a stream by cutting the text into separate calls changes the voice partway through.
 
 ## Features
 
@@ -62,14 +60,14 @@ After the integration is created, click **Add built-in voice**, **Add designed v
 | Type                   | What it does                                                                                                  |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------- |
 | **Built-in**     | Pick from `Chloe`, `Mia`, `Milo`, `Dean`, `冰糖`, `茉莉`, `苏打`, `白桦`, or `mimo_default` |
-| **Voice design** | Describe the voice in natural language (e.g. "young female,*Taiwanese accent*, warm tone")                  |
-| **Voice clone**  | Upload an mp3/wav sample (≤10 MB) or pick an existing one from `/media/voice_samples/`                     |
+| **Voice design** | Describe the voice in natural language (e.g. "young female, Taiwanese accent, warm tone")                  |
+| **Voice clone**  | Upload an mp3/wav sample (≤10 MB) or pick an existing one from your samples directory                     |
 
 ### 5. Assign to Voice Pipeline
 
 [![Open your Home Assistant instance and manage your voice assistants.](https://my.home-assistant.io/badges/voice_assistants.svg)](https://my.home-assistant.io/redirect/voice_assistants/)
 
-Select or create a voice pipeline, then set **Text-to-speech** to your Xiaomi MiMo TTS profile. A built-in-voice profile streams its audio automatically; design and clone profiles synthesise the reply in one go.
+Select or create a voice pipeline, then set **Text-to-speech** to your Xiaomi MiMo TTS profile.
 
 ### Configuration Options
 
@@ -85,11 +83,11 @@ Each voice profile can be reconfigured independently from its three-dot menu (re
 
 ### Uninstallation
 
-**Settings > Devices & Services** > Xiaomi MiMo TTS > three-dot menu > **Delete** > remove `custom_components/xiaomi_mimo_tts/` > restart HA. Voice sample files under `/media/voice_samples/` are not removed automatically.
+**Settings > Devices & Services** > Xiaomi MiMo TTS > three-dot menu > **Delete** > remove `custom_components/xiaomi_mimo_tts/` > restart HA. Voice sample files in your samples directory are not removed automatically.
 
 ## Debugging
 
-Enable debug logging to see synthesis details and SSE chunks:
+The client logs its retry and backoff decisions at debug level. Per-call figures are on the diagnostic sensors, not in the log.
 
 ```yaml
 # configuration.yaml
@@ -113,7 +111,7 @@ HA caches TTS audio by `(message, language, options)`. Reconfiguring a profile d
 
 **Where do voice clone samples live?**
 
-`/media/voice_samples/`. Files uploaded through the config flow land there with auto-named `clone_<uuid>.{mp3,wav}` (or your chosen filename). They appear in HA's Media Browser and can be reused across multiple voice clone profiles.
+In the samples directory, `/media/voice_samples/` by default. Files uploaded through the config flow land there with auto-named `clone_<uuid>.{mp3,wav}` (or your chosen filename). They appear in HA's Media Browser and can be reused across multiple voice clone profiles.
 
 **Can I configure multiple Xiaomi MiMo accounts?**
 
@@ -123,7 +121,9 @@ Yes. Add the integration multiple times with different API keys. Each instance h
 
 The **Total audio minutes** and **Total characters synthesized** sensors track cumulative usage per profile. The full set covers request counts, durations, last text, time to first audio, and last result enum.
 
-**Last time to first audio** is the wait before audio starts, whichever path the call took, so it is comparable across profiles: a streaming call reports the time to its first chunk, and a one-shot call reports the whole synthesis, because nothing can play until it finishes. **Streaming** says which of the two happened. For design and clone the wait grows with the length of the reply, because the whole clip has to be inferred first.
+**How long before a reply starts playing?**
+
+The **Last time to first audio** sensor answers this for every profile: a streaming call reports the time to its first chunk, a one-shot call reports the whole synthesis, because nothing can play until it finishes. **Streaming** says which of the two happened. For design and clone the wait grows with the length of the reply, since the whole clip has to be inferred first.
 
 **How do I install the latest development version?**
 
@@ -136,7 +136,7 @@ After the integration is installed via HACS, switch to the latest `main` branch 
 5. Click **Perform Action**
 6. Restart HA
 
-To revert, run the same action with a release tag (e.g., `0.1.0`).
+To revert, run the same action with a release tag instead of `main`.
 
 ## Contributing
 
