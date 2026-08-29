@@ -1,6 +1,6 @@
 [project]
 name = "xiaomi-mimo-tts"
-version = "0.1.0"
+version = "0.2.0"
 description = "Home Assistant TTS integration for Xiaomi MiMo TTS v2.5"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -74,7 +74,7 @@ exclude_lines = [
 ]
 
 [tool.commitizen]
-version = "0.1.0"
+version = "0.2.0"
 version_files = [
     "pyproject.toml:version",
     "custom_components/xiaomi_mimo_tts/manifest.json:version",
