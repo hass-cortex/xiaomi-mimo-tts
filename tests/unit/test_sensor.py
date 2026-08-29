@@ -2,23 +2,25 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
+from custom_components.xiaomi_mimo_tts.engine.audio import BYTES_PER_SECOND
 from custom_components.xiaomi_mimo_tts.engine.models import TTSCallStats
 
 
-def _ok_stats(text: str = "hello", audio_bytes: int = 24_000 * 2) -> TTSCallStats:
+def _ok_stats(text: str = "hello", audio_bytes: int = BYTES_PER_SECOND) -> TTSCallStats:
     return TTSCallStats(
         success=True,
         error_kind=None,
         duration_ms=400.0,
         audio_bytes=audio_bytes,
-        audio_seconds=audio_bytes / (24_000 * 2),
+        audio_seconds=audio_bytes / BYTES_PER_SECOND,
         text=text,
         text_chars=len(text),
         streaming=False,
         ttft_ms=None,
-        sentence_count=None,
     )
 
 
@@ -33,7 +35,6 @@ def _err_stats(kind: str = "api") -> TTSCallStats:
         text_chars=1,
         streaming=False,
         ttft_ms=None,
-        sentence_count=None,
     )
 
 
@@ -58,7 +59,7 @@ def test_total_audio_minutes_accumulates_only_on_success() -> None:
     from custom_components.xiaomi_mimo_tts.sensor import SENSOR_DESCRIPTIONS
 
     desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "total_audio_minutes")
-    s = _ok_stats(audio_bytes=24_000 * 2 * 60)  # 60 seconds of audio
+    s = _ok_stats(audio_bytes=BYTES_PER_SECOND * 60)  # 60 seconds of audio
     assert desc.update_fn(0.0, s) == pytest.approx(1.0, abs=0.01)
     assert desc.update_fn(1.0, _err_stats()) == 1.0
 
@@ -87,4 +88,14 @@ def test_last_result_classifies_kind() -> None:
 def test_sensor_descriptions_count() -> None:
     from custom_components.xiaomi_mimo_tts.sensor import SENSOR_DESCRIPTIONS
 
-    assert len(SENSOR_DESCRIPTIONS) == 15
+    assert len(SENSOR_DESCRIPTIONS) == 14
+
+
+def test_last_ttft_clears_on_a_non_streaming_call() -> None:
+    """A profile that stopped streaming must not keep reporting an old TTFT."""
+    from custom_components.xiaomi_mimo_tts.sensor import SENSOR_DESCRIPTIONS
+
+    desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "last_ttft")
+    streamed = replace(_ok_stats(), streaming=True, ttft_ms=852.4)
+    assert desc.update_fn(None, streamed) == 852.4
+    assert desc.update_fn(852.4, _ok_stats()) is None

@@ -16,11 +16,28 @@ REQUIRED_MODELS: Final[frozenset[str]] = frozenset(
     {MODEL_BUILT_IN, MODEL_VOICE_DESIGN, MODEL_VOICE_CLONE}
 )
 
+_LOW_LATENCY_STREAM_MODELS: Final[frozenset[str]] = frozenset({MODEL_BUILT_IN})
+
 ModelId = Literal[
     "mimo-v2.5-tts",
     "mimo-v2.5-tts-voicedesign",
     "mimo-v2.5-tts-voiceclone",
 ]
+
+
+def supports_low_latency_stream(model: str) -> bool:
+    """Whether the model emits audio incrementally while it is still inferring.
+
+    The others are in compatibility mode: one call returns the whole clip in a
+    single SSE event once inference has finished.
+
+    Args:
+        model: A Xiaomi MiMo model id.
+
+    Returns:
+        True if the server streams this model's audio out during inference.
+    """
+    return model in _LOW_LATENCY_STREAM_MODELS
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +93,8 @@ class SynthesisResult:
     audio_bytes: bytes
     audio_format: Literal["wav", "pcm16"]
     duration_ms: float
+    pcm_bytes: int
+    """Payload length without any container header — audio duration comes from this."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,4 +115,3 @@ class TTSCallStats:
     text_chars: int
     streaming: bool
     ttft_ms: float | None
-    sentence_count: int | None

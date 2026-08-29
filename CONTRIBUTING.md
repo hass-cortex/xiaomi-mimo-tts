@@ -65,7 +65,7 @@ Example: `feat: add support for voice design style preview`
 
 The codebase follows a strict **engine / HA-shell split**:
 
-- `engine/` — HA-decoupled core (no `homeassistant.*` imports). Covers the Xiaomi MiMo API client, voice models, streaming pipeline, and error hierarchy. Testable with plain pytest — no `sys.modules` mocking needed.
+- `engine/` — HA-decoupled core (no `homeassistant.*` imports). Covers the Xiaomi MiMo API client, voice models, audio format facts, and error hierarchy. Testable with plain pytest — no `sys.modules` mocking needed.
 - HA-shell — the surrounding integration files (`tts.py`, `sensor.py`, `config_flow.py`, etc.) that wire the engine into Home Assistant.
 
 ```
@@ -75,10 +75,10 @@ xiaomi-mimo-tts/
       client.py          # XiaomiMimoClient (aiohttp session injected via constructor)
       models.py          # VoiceConfig, SynthesisResult, TTSCallStats — pure dataclasses
       errors.py          # XiaomiMimoError hierarchy (plain Exception — no HA coupling)
-      stream.py          # Streaming WAV header + sentence-batching pipeline
+      audio.py           # PCM16/24kHz facts + build_wav_header
     __init__.py          # Integration setup: async_setup_entry / async_unload_entry
     tts.py               # XiaomiMimoTTSEntity — translates engine errors to HA exceptions
-    sensor.py            # 15 diagnostic sensors per voice profile (RestoreSensor)
+    sensor.py            # 14 diagnostic sensors per voice profile (RestoreSensor)
     runtime.py           # XiaomiMimoTTSRuntimeData dataclass (HA refs + engine client)
     config_flow.py       # Config, subentry (built_in/voice_design/voice_clone), reauth, reconfigure flows
     voice_sample.py      # Resolve media_content_id → base64 via HA media_source

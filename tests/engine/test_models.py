@@ -71,6 +71,7 @@ def test_synthesis_result_carries_audio_metadata() -> None:
         audio_bytes=b"RIFF\x00\x00\x00\x00WAVE",
         audio_format="wav",
         duration_ms=1234.5,
+        pcm_bytes=0,
     )
     assert sr.audio_bytes.startswith(b"RIFF")
     assert sr.audio_format == "wav"
@@ -88,7 +89,6 @@ def test_ttscallstats_streaming_has_ttft() -> None:
         text_chars=11,
         streaming=True,
         ttft_ms=200.0,
-        sentence_count=1,
     )
     assert stats.success
     assert stats.ttft_ms == 200.0

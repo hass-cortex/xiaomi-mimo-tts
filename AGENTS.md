@@ -4,11 +4,11 @@ Instructions for AI coding agents working on this repository.
 
 ## Project Overview
 
-Home Assistant custom integration for **Xiaomi MiMo TTS v2.5** (text-to-speech) with three voice profile types — built-in voices, natural-language voice design, and audio-sample voice cloning — plus a streaming pipeline that improves perceived TTFT for HA Assist Pipeline.
+Home Assistant custom integration for **Xiaomi MiMo TTS v2.5** (text-to-speech) with three voice profile types — built-in voices, natural-language voice design, and audio-sample voice cloning. Built-in voices stream their audio out of the API as it is inferred, which is what keeps TTFT low for the HA Assist Pipeline.
 
 ## Tech Stack
 
-- **Runtime**: Python 3.14+, aiohttp, sentence-stream
+- **Runtime**: Python 3.14+, aiohttp
 - **Package manager**: `uv` (not pip)
 - **Testing**: pytest, pytest-asyncio (asyncio_mode = "auto"), pytest-cov, aioresponses
 - **Linting**: ruff (lint + format)
@@ -22,13 +22,13 @@ The integration is split into a **HA-decoupled engine** (`engine/`) and a **HA s
 
 ```
 custom_components/xiaomi_mimo_tts/
-│  HA-DECOUPLED CORE  (stdlib + aiohttp + sentence-stream only)
+│  HA-DECOUPLED CORE  (stdlib + aiohttp only)
 ├── engine/
 │   ├── __init__.py
-│   ├── client.py            # XiaomiMimoClient — aiohttp-based Xiaomi MiMo API client
+│   ├── client.py            # XiaomiMimoClient — aiohttp-based Xiaomi MiMo API client (always stream=true)
 │   ├── models.py            # VoiceConfig, ValidationResult, SynthesisResult, TTSCallStats
 │   ├── errors.py            # XiaomiMimoError tree (extends Exception, NOT HomeAssistantError)
-│   └── stream.py            # make_streaming_wav_header + sentence pipeline
+│   └── audio.py             # PCM16/24kHz facts + build_wav_header
 │
 │  HA-INTEGRATION SHELL  (imports engine + homeassistant.*)
 ├── __init__.py              # async_setup_entry / async_unload_entry / update_listener
@@ -38,15 +38,14 @@ custom_components/xiaomi_mimo_tts/
 ├── tts.py                   # XiaomiMimoTTSEntity — non-streaming + streaming + stats push
 ├── voice_sample.py          # VoiceSampleResolver — resolve media_content_id → base64
 ├── selector.py              # list_existing_samples + save_uploaded_sample helpers
-├── sensor.py                # 15 SensorEntityDescriptions + RestoreSensor subclass
+├── sensor.py                # 14 SensorEntityDescriptions + RestoreSensor subclass
 ├── config_flow.py           # ConfigFlow + 3 SubentryFlows + Reauth + Reconfigure + Options
 ├── repairs.py               # 4 issue helpers (sample missing, model unavailable, quota, dir)
 ├── diagnostics.py           # async_get_config_entry_diagnostics with redaction
 ├── icons.json
 ├── strings.json             # UI strings (source of truth)
 ├── translations/
-│   ├── en.json              # ≡ strings.json byte-identical
-│   └── zh-Hant.json
+│   └── en.json              # ≡ strings.json byte-identical
 └── quality_scale.yaml       # Platinum compliance matrix
 ```
 
@@ -54,9 +53,9 @@ custom_components/xiaomi_mimo_tts/
 
 - **Engine boundary**: `engine/` is pure Python — `XiaomiMimoClient` accepts `aiohttp.ClientSession` via constructor (Dependency Inversion). HA shell passes `async_get_clientsession(hass)`; engine tests pass an `aioresponses`-mocked session.
 - **Error translation at boundary**: `engine/errors.py` defines `XiaomiMimoError` (subclass of `Exception`). The HA shell (`tts.py`) catches `XiaomiMimoAuthError` → `ConfigEntryAuthFailed` (and triggers `entry.async_start_reauth(hass)`); other `XiaomiMimoError` → `HomeAssistantError`.
-- **Subentry-per-voice-profile**: 1 config entry = 1 API key. Each subentry (`built_in` / `voice_design` / `voice_clone`) maps to one Xiaomi MiMo model and produces one HA device + 1 TTS entity + 15 sensors.
+- **Subentry-per-voice-profile**: 1 config entry = 1 API key. Each subentry (`built_in` / `voice_design` / `voice_clone`) maps to one Xiaomi MiMo model and produces one HA device + 1 TTS entity + 14 diagnostic sensors (15 for built-in and clone, which add a Voice sensor).
 - **Voice sample storage**: clones live in `/media/voice_samples/`. Subentries store only a `media_content_id` (small). `VoiceSampleResolver` resolves on demand with mtime-based caching keyed by content_id; the resolver instance is cached on the entity to avoid per-call allocation.
-- **Streaming pipeline**: `engine/stream.py::synthesize_text_stream` reads an `AsyncIterator[str]` (HA `request.message_gen`), uses `sentence-stream` for CJK + ASCII boundary detection, batches per `[1, 3, ALL]` schedule (mirror ElevenLabs), and yields PCM bytes. The shell `tts.py::_stream` prepends a streaming WAV header (sentinel `0xFFFFFFFF` length) and counts emitted PCM bytes for `TTSCallStats.audio_seconds`.
+- **One request per utterance**: the API takes no incremental input — `messages` must carry complete text — so every call sends the whole reply, and the only thing that streams is the response. `tts.py::_stream` drains `request.message_gen`, issues one `synthesize_stream`, prepends the streaming WAV header (sentinel `0xFFFFFFFF` length) and relays PCM chunks as they land. It is only reachable for models `engine.models.supports_low_latency_stream` accepts; `async_supports_streaming_input` returns False for the others so HA routes them through `async_get_tts_audio` instead.
 - **Sensor push updates**: `XiaomiMimoTTSEntity._push_stats(TTSCallStats)` fires after each call (success or failure). Sensors are `RestoreSensor` (state persists across HA restarts) and self-register in `runtime_data.sensors_by_subentry` on `async_added_to_hass`.
 
 ## Development Commands
@@ -87,13 +86,14 @@ uv run cz bump --prerelease beta           # Version bump for beta release
 - **Releasing**: `cz bump` locally (updates `pyproject.toml` + `manifest.json`, creates commit + tag), sync `uv.lock`, push with `--follow-tags`. GitHub Actions creates the release automatically. See [Release Workflow](#release-workflow) for full steps.
 - **Docstrings**: Google-style with Args/Returns/Raises sections.
 - **Type annotations**: required on all public functions. Use `TYPE_CHECKING` guard for HA imports (engine never imports HA at all).
-- **Error handling**: engine errors extend `Exception`. The HA shell translates them at the boundary (`tts.py`). Non-streaming `synthesize` retries once on 429/5xx/connection errors; streaming `synthesize_stream` does NOT retry (would corrupt yielded byte order).
+- **Error handling**: engine errors extend `Exception`. The HA shell translates them at the boundary (`tts.py`). `synthesize` retries once on 429/5xx/connection errors — it buffers the whole clip before returning, so a replay is invisible to the caller; `synthesize_stream` does NOT retry (would corrupt yielded byte order).
 - **Translations**: `strings.json` is source of truth. `translations/en.json` must be kept in sync (byte-identical). When modifying schemas, also update both translation files for any new field labels.
 
 ## Known Issues
 
 - `homeassistant` is not installed as a dependency (it's mocked in tests), so pyright is configured with `reportMissingImports = "none"` and `reportMissingTypeStubs = "none"`. IDE setups (e.g. Pylance) may surface those import warnings locally; suppress per-workspace if noisy.
-- Xiaomi MiMo v2.5 streaming is in **compatibility mode** — each batch's full inference completes before SSE chunks dump. Real per-call low-latency streaming is announced but not yet live. The integration's sentence pipeline still helps long replies (next batch synthesises while current plays).
+- Only `mimo-v2.5-tts` has low-latency streaming (measured 2026-08-29: ~0.9 s to first audio, 60 SSE chunks, delivered ~4x faster than realtime). `mimo-v2.5-tts-voicedesign` and `mimo-v2.5-tts-voiceclone` are still in **compatibility mode** — one SSE event carrying the whole clip after inference finishes. `_LOW_LATENCY_STREAM_MODELS` in `engine/models.py` is the single place that records this, reached only through `supports_low_latency_stream()`; adding a model there is all it takes to switch it on once Xiaomi ships streaming for it.
+- Do not reintroduce sentence batching. Splitting a reply into several calls trades a fixed ~870 ms first-packet cost per extra call for an earlier start, and every boundary is an independent inference: measured across 3 calls of identical text, voice design drifts 34% in spectral centroid and 26% in duration, voice clone 12% in F0, against a 5%/8% floor on the built-in model. Voice clone also re-uploads its whole base64 sample per call. With text already in hand it is a straight loss (867 ms vs 1263 ms TTFT, 4598 ms vs 7846 ms total); the only thing it ever bought was overlapping the LLM's remaining generation time, which was judged not worth the complexity.
 
 ## Quality Scale
 
@@ -183,4 +183,4 @@ HACS only checks GitHub's `prerelease` boolean flag — tag naming does not affe
 - Log Xiaomi MiMo API response bodies for auth errors (401/403) — security risk. The `api_key` must also be redacted in `XiaomiMimoClient.__repr__` and in `diagnostics.py`.
 - Use `vol.Optional(key, default=X)` to pre-fill reconfigure forms for fields users may want to clear. `default=` falls back to `X` when HA frontend omits the empty key, silently restoring the old value. Use `description={"suggested_value": X}` instead.
 - `await` `async_update_reload_and_abort` or `async_update_and_abort` — they are `@callback` synchronous methods that return result dicts.
-- Retry streaming calls — `synthesize_stream` cannot be replayed mid-stream without restarting audio. Only `synthesize` (non-streaming) retries.
+- Retry `synthesize_stream` — it cannot be replayed mid-stream without restarting audio. `synthesize` may retry only because it hands the caller nothing until the last byte has arrived; keep that property if you touch it.

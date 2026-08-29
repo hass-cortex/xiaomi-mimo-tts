@@ -11,11 +11,12 @@ import base64
 import json
 import logging
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from typing import Final, Literal
 
 import aiohttp
 
+from .audio import build_wav_header
 from .errors import (
     XiaomiMimoApiError,
     XiaomiMimoAuthError,
@@ -68,32 +69,29 @@ class XiaomiMimoClient:
         voice_config: VoiceConfig,
         audio_format: Literal["wav", "pcm16"],
     ) -> SynthesisResult:
-        """Single attempt — one-shot non-streaming TTS call."""
-        url = f"{self._base_url}/chat/completions"
-        body = self._build_body(text, voice_config, audio_format, stream=False)
-        start = time.monotonic()
-        try:
-            async with self._session.post(
-                url,
-                headers=self._headers,
-                json=body,
-                timeout=aiohttp.ClientTimeout(total=self._timeout),
-            ) as resp:
-                if resp.status != 200:
-                    await self._raise_for_status(resp)
-                payload = await resp.json()
-        except TimeoutError as exc:
-            raise XiaomiMimoTimeoutError("synthesize timed out") from exc
-        except aiohttp.ClientConnectionError as exc:
-            raise XiaomiMimoConnectionError(str(exc)) from exc
+        """Single attempt — collect the whole stream into one clip.
 
+        Streams even though the caller wants every byte: the server emits
+        audio while it is still inferring, so draining the stream completes
+        sooner than waiting on the one-shot response. Retrying this stays safe
+        precisely because nothing reaches the caller until the last byte has
+        arrived — unlike `synthesize_stream`, which cannot be replayed.
+        """
+        start = time.monotonic()
+        pcm = bytearray()
+        async for chunk in self.synthesize_stream(text, voice_config):
+            pcm.extend(chunk)
         duration_ms = (time.monotonic() - start) * 1000.0
-        b64 = payload["choices"][0]["message"]["audio"]["data"]
-        audio_bytes = base64.b64decode(b64)
+
+        pcm_bytes = len(pcm)
+        audio_bytes = bytes(pcm)
+        if audio_format == "wav":
+            audio_bytes = build_wav_header(pcm_bytes) + audio_bytes
         return SynthesisResult(
             audio_bytes=audio_bytes,
             audio_format=audio_format,
             duration_ms=duration_ms,
+            pcm_bytes=pcm_bytes,
         )
 
     async def synthesize_stream(
@@ -102,12 +100,12 @@ class XiaomiMimoClient:
         """Stream PCM bytes from Xiaomi MiMo with stream=true. NO retry — bytes are
         already being yielded; restart not possible without restarting audio.
 
-        Uses chunked reading + manual SSE event parsing because Xiaomi MiMo v2.5
-        compat-mode often emits a single huge ``data:`` line per batch
+        Uses chunked reading + manual SSE event parsing because the
+        compatibility-mode models emit the whole clip as one ``data:`` line
         (multi-MB), which exceeds aiohttp's default 128 KiB readline limit.
         """
         url = f"{self._base_url}/chat/completions"
-        body = self._build_body(text, voice_config, "pcm16", stream=True)
+        body = self._build_body(text, voice_config)
         try:
             async with self._session.post(
                 url,
@@ -134,23 +132,28 @@ class XiaomiMimoClient:
         readline limit) by buffering raw bytes instead of lines.
         """
         buffer = bytearray()
+        scanned = 0
         async for chunk in resp.content.iter_chunked(64 * 1024):
             buffer.extend(chunk)
             # Process complete SSE events. Each event ends with "\n\n".
             while True:
-                sep = buffer.find(b"\n\n")
+                sep = buffer.find(b"\n\n", scanned)
                 if sep == -1:
+                    # Keep one byte back so a separator split across two
+                    # chunks is still found.
+                    scanned = max(0, len(buffer) - 1)
                     break
-                event_bytes = bytes(buffer[:sep])
+                event_bytes = bytes(memoryview(buffer)[:sep])
                 del buffer[: sep + 2]
-                async for pcm in self._decode_sse_event(event_bytes):
+                scanned = 0
+                for pcm in self._decode_sse_event(event_bytes):
                     yield pcm
         # Trailing event without final blank line
         if buffer.strip():
-            async for pcm in self._decode_sse_event(bytes(buffer)):
+            for pcm in self._decode_sse_event(bytes(buffer)):
                 yield pcm
 
-    async def _decode_sse_event(self, event: bytes) -> AsyncIterator[bytes]:
+    def _decode_sse_event(self, event: bytes) -> Iterator[bytes]:
         """Decode one SSE event's ``data:`` lines into PCM bytes."""
         for line in event.split(b"\n"):
             line = line.strip()
@@ -220,28 +223,20 @@ class XiaomiMimoClient:
             "Content-Type": "application/json",
         }
 
-    def _build_body(
-        self,
-        text: str,
-        vc: VoiceConfig,
-        audio_format: str,
-        *,
-        stream: bool,
-    ) -> dict:  # type: ignore[type-arg]
-        audio: dict[str, str] = {"format": audio_format}
+    def _build_body(self, text: str, vc: VoiceConfig) -> dict:  # type: ignore[type-arg]
+        """Build the request body. Always streaming, and streaming implies pcm16."""
+        audio: dict[str, str] = {"format": "pcm16"}
         if vc.voice is not None:
             audio["voice"] = vc.voice
-        body: dict = {  # type: ignore[type-arg]
+        return {
             "model": vc.model,
             "messages": [
                 {"role": "user", "content": vc.style_prompt},
                 {"role": "assistant", "content": text},
             ],
             "audio": audio,
+            "stream": True,
         }
-        if stream:
-            body["stream"] = True
-        return body
 
     async def _raise_for_status(self, resp: aiohttp.ClientResponse) -> None:
         body = await _safe_read_json(resp)

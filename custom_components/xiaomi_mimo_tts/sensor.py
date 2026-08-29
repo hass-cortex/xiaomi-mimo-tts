@@ -1,4 +1,4 @@
-"""Xiaomi MiMo TTS diagnostic sensors (15 per voice profile)."""
+"""Xiaomi MiMo TTS diagnostic sensors (14 per voice profile)."""
 
 from __future__ import annotations
 
@@ -198,12 +198,12 @@ SENSOR_DESCRIPTIONS: tuple[XiaomiMimoSensorDescription, ...] = (
     XiaomiMimoSensorDescription(
         key="last_ttft",
         translation_key="last_ttft",
-        name="Last TTFT",
+        name="Last time to first audio",
         icon="mdi:speedometer",
         native_unit_of_measurement=UnitOfTime.MILLISECONDS,
-        update_fn=lambda cur, s: (
-            round(s.ttft_ms, 1) if s.streaming and s.ttft_ms is not None else cur
-        ),
+        # How long before audio starts, whichever path the call took. Clears
+        # on failure rather than keeping a stale reading.
+        update_fn=lambda cur, s: round(s.ttft_ms, 1) if s.ttft_ms is not None else None,
     ),
     XiaomiMimoSensorDescription(
         key="last_streaming",
@@ -212,15 +212,6 @@ SENSOR_DESCRIPTIONS: tuple[XiaomiMimoSensorDescription, ...] = (
         icon="mdi:transit-connection-variant",
         entity_category=EntityCategory.DIAGNOSTIC,
         update_fn=lambda cur, s: bool(s.streaming),
-    ),
-    XiaomiMimoSensorDescription(
-        key="last_sentence_count",
-        translation_key="last_sentence_count",
-        name="Last sentence count",
-        icon="mdi:format-paragraph",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-        update_fn=lambda cur, s: s.sentence_count,
     ),
 )
 

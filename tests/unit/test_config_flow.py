@@ -165,6 +165,7 @@ async def test_voice_clone_pick_existing(mock_hass) -> None:
     flow.hass = mock_hass
     flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
     flow._chosen_name = "Alice Clone"
+    flow._get_entry = MagicMock(return_value=MagicMock(options={}))
 
     with patch(
         "custom_components.xiaomi_mimo_tts.config_flow.list_existing_samples",
@@ -280,7 +281,6 @@ async def test_options_flow_creates_entry(mock_hass) -> None:
             "request_timeout": 90,
             "streaming_enabled": False,
             "voice_samples_dir": "/media/x",
-            "default_audio_format": "pcm16",
         }
     )
     assert submit_result == {"type": "create_entry"}
@@ -302,3 +302,26 @@ async def test_built_in_subentry_reconfigure(mock_hass) -> None:
 
     result = await flow.async_step_reconfigure(None)
     assert result == {"type": "form"}
+
+
+@pytest.mark.asyncio
+async def test_voice_clone_uses_the_configured_samples_dir(mock_hass) -> None:
+    """The samples directory option must reach the listing and the upload."""
+    from custom_components.xiaomi_mimo_tts.config_flow import VoiceCloneSubentryFlow
+
+    flow = VoiceCloneSubentryFlow()
+    flow.hass = mock_hass
+    flow.async_show_form = MagicMock(return_value={"type": "form"})
+    flow._chosen_name = "Alice Clone"
+    flow._get_entry = MagicMock(
+        return_value=MagicMock(options={"voice_samples_dir": "/media/custom_dir"})
+    )
+    assert flow._samples_dir == "/media/custom_dir"
+
+    lister = AsyncMock(return_value=[])
+    with patch(
+        "custom_components.xiaomi_mimo_tts.config_flow.list_existing_samples",
+        new=lister,
+    ):
+        await flow.async_step_pick(None)
+    assert lister.await_args.kwargs["dir_path"] == "/media/custom_dir"

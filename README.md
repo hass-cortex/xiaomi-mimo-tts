@@ -9,21 +9,19 @@
 A Home Assistant custom integration providing cloud-based text-to-speech via the [Xiaomi MiMo TTS v2.5 API](https://platform.xiaomimimo.com), with built-in voices, natural-language voice design, and voice cloning from audio samples.
 
 ```
-Text ──► Sentence Pipeline ──► Xiaomi MiMo API ──► Streaming Audio
-              │                    ▲
-              │                    │
-       schedule [1, 3, ALL]    voice profile
-       (CJK + ASCII boundaries)
+Reply text ──► Xiaomi MiMo API ──► Streaming Audio ──► Media player
+   (whole)          ▲                (as inferred)
+                voice profile
 ```
 
-Replies start playing as soon as the first sentence is synthesised; subsequent batches stream in while the previous batch plays, dramatically reducing perceived TTFT for Assist Pipeline.
+With a built-in voice the API emits audio while it is still inferring, so playback starts on the first chunk rather than after the whole clip, and the wait does not grow with the length of the reply. Voice design and voice clone profiles do not advertise streaming: the API returns their audio in one piece, and faking a stream by cutting the text into separate calls changes the voice partway through.
 
 ## Features
 
 - **Three voice profile types** — built-in voices, voice design (text-described), and voice cloning (mp3/wav samples)
-- **Streaming TTS pipeline** — CJK-aware sentence detection + `[1, 3, ALL]` batch schedule reduces TTFT from ~30s to ~5s on long replies
-- **15 diagnostic sensors per profile** — request counts, durations, audio size/seconds, TTFT, sentence count, last text
-- **Media Browser-managed samples** — voice clone samples live under `/media/voice_samples/`, reusable across multiple profiles
+- **Streaming audio output** — built-in voices start playing on the first chunk, so the wait does not grow with the length of the reply
+- **Diagnostic sensors per profile** — request counts, durations, audio size/seconds, time to first audio, last text
+- **Media Browser-managed samples** — pick or upload voice clone samples from the Media Browser, and reuse one sample across profiles
 - **Platinum quality scale** — config flow, runtime data, reauth, reconfigure, repair issues, diagnostics with redaction
 
 ## Getting Started
@@ -59,7 +57,7 @@ Enter your **API key**. The integration validates against `GET /v1/models` (free
 
 ### 4. Add a Voice Profile
 
-After the integration is created, click **Add built-in voice**, **Add designed voice**, or **Add cloned voice** on the integration card. Each subentry creates one TTS entity + a device with 15 sensors.
+After the integration is created, click **Add built-in voice**, **Add designed voice**, or **Add cloned voice** on the integration card. Each subentry creates one TTS entity + a device with 14 diagnostic sensors, plus a Voice sensor for built-in and clone profiles.
 
 | Type                   | What it does                                                                                                  |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -71,7 +69,7 @@ After the integration is created, click **Add built-in voice**, **Add designed v
 
 [![Open your Home Assistant instance and manage your voice assistants.](https://my.home-assistant.io/badges/voice_assistants.svg)](https://my.home-assistant.io/redirect/voice_assistants/)
 
-Select or create a voice pipeline, then set **Text-to-speech** to your Xiaomi MiMo TTS profile. Streaming kicks in automatically for multi-sentence assistant replies.
+Select or create a voice pipeline, then set **Text-to-speech** to your Xiaomi MiMo TTS profile. A built-in-voice profile streams its audio automatically; design and clone profiles synthesise the reply in one go.
 
 ### Configuration Options
 
@@ -80,9 +78,8 @@ Select or create a voice pipeline, then set **Text-to-speech** to your Xiaomi Mi
 Configure via the integration page > **Configure**:
 
 - **Request timeout** -- per-call timeout in seconds (default 60)
-- **Streaming enabled** -- master switch for the streaming pipeline (default on)
+- **Streaming enabled** -- stream audio out as it is inferred (default on). Only affects built-in voice profiles; design and clone always synthesise in one call.
 - **Voice samples directory** -- where uploaded clone samples are persisted (default `/media/voice_samples`)
-- **Default audio format** -- `wav` or `pcm16` (default `wav`)
 
 Each voice profile can be reconfigured independently from its three-dot menu (rename, switch voice, replace sample).
 
@@ -104,9 +101,11 @@ logger:
 
 ## FAQ
 
-**Why does the audio still take ~5 seconds before playing?**
+**Why is a voice design or clone profile so much slower to start than a built-in voice?**
 
-Xiaomi MiMo v2.5 streaming is currently in **compatibility mode** — each batch's full inference completes before chunks dump. Real per-call low-latency streaming is announced but not yet live. The integration's sentence pipeline still helps long replies: while batch 1 plays, batch 2 is being synthesised in parallel.
+Only `mimo-v2.5-tts` has low-latency streaming. `mimo-v2.5-tts-voicedesign` and `mimo-v2.5-tts-voiceclone` are still in **compatibility mode**: one call returns the whole clip in a single chunk once inference has finished. There is nothing to stream, so those profiles tell Home Assistant they do not support streaming and the whole reply is synthesised in one call.
+
+Cutting the text into several calls would report first audio sooner, but each call is an independent inference. Voice design generates a fresh voice every time, so a long reply changes speaker partway through; voice clone stays closer to its sample but still shifts in pitch and pace, and re-uploads the whole sample on every call. Splitting also makes the reply slower overall. Use a built-in voice for the Assist Pipeline and keep design/clone for announcements, where a few seconds of lead time does not matter.
 
 **The TTS cache is masking my new voice settings.**
 
@@ -122,7 +121,9 @@ Yes. Add the integration multiple times with different API keys. Each instance h
 
 **How do I track Xiaomi MiMo quota usage?**
 
-The **Total audio minutes** and **Total characters synthesized** sensors track cumulative usage per profile. The full set of 15 sensors covers request counts, durations, last text, TTFT, sentence count, and last result enum.
+The **Total audio minutes** and **Total characters synthesized** sensors track cumulative usage per profile. The full set covers request counts, durations, last text, time to first audio, and last result enum.
+
+**Last time to first audio** is the wait before audio starts, whichever path the call took, so it is comparable across profiles: a streaming call reports the time to its first chunk, and a one-shot call reports the whole synthesis, because nothing can play until it finishes. **Streaming** says which of the two happened. For design and clone the wait grows with the length of the reply, because the whole clip has to be inferred first.
 
 **How do I install the latest development version?**
 

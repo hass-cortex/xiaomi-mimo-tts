@@ -22,8 +22,7 @@
       },
       "last_text": {"default": "mdi:text"},
       "last_ttft": {"default": "mdi:speedometer"},
-      "last_streaming": {"default": "mdi:transit-connection-variant"},
-      "last_sentence_count": {"default": "mdi:format-paragraph"}
+      "last_streaming": {"default": "mdi:transit-connection-variant"}
     }
   }
 }

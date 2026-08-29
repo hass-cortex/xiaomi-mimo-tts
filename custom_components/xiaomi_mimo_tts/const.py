@@ -5,22 +5,12 @@ from __future__ import annotations
 from typing import Final
 
 from .engine.client import DEFAULT_BASE_URL
-from .engine.models import (
-    MODEL_BUILT_IN,
-    MODEL_VOICE_CLONE,
-    MODEL_VOICE_DESIGN,
-    REQUIRED_MODELS,
-)
-from .engine.stream import BYTES_PER_SECOND, CHANNELS, SAMPLE_RATE, SAMPLE_WIDTH_BYTES
 
 __all__ = [
     "ALLOWED_SAMPLE_MIMES",
     "BUILT_IN_VOICES",
-    "BYTES_PER_SECOND",
-    "CHANNELS",
     "CONF_API_KEY",
     "CONF_BASE_URL",
-    "CONF_DEFAULT_AUDIO_FORMAT",
     "CONF_DEFAULT_STYLE_PROMPT",
     "CONF_REQUEST_TIMEOUT",
     "CONF_STREAMING_ENABLED",
@@ -36,13 +26,6 @@ __all__ = [
     "DEFAULT_VOICE_SAMPLES_DIR",
     "DOMAIN",
     "MAX_SAMPLE_BYTES",
-    "MODEL_BUILT_IN",
-    "MODEL_VOICE_CLONE",
-    "MODEL_VOICE_DESIGN",
-    "REQUIRED_MODELS",
-    "SAMPLE_RATE",
-    "SAMPLE_WIDTH_BYTES",
-    "STREAM_SCHEDULE",
     "SUBENTRY_TYPES",
     "SUBENTRY_TYPE_BUILT_IN",
     "SUBENTRY_TYPE_VOICE_CLONE",
@@ -59,7 +42,6 @@ CONF_BASE_URL: Final = "base_url"
 CONF_REQUEST_TIMEOUT: Final = "request_timeout"
 CONF_STREAMING_ENABLED: Final = "streaming_enabled"
 CONF_VOICE_SAMPLES_DIR: Final = "voice_samples_dir"
-CONF_DEFAULT_AUDIO_FORMAT: Final = "default_audio_format"
 
 DEFAULT_REQUEST_TIMEOUT: Final = 60
 DEFAULT_STREAMING_ENABLED: Final = True
@@ -96,9 +78,6 @@ BUILT_IN_VOICES: Final = (
     "苏打",
     "白桦",
 )
-
-# Streaming schedule
-STREAM_SCHEDULE: Final = (1, 3)  # batch sizes; remainder always batched together
 
 # Voice clone sample limits
 MAX_SAMPLE_BYTES: Final = 10 * 1024 * 1024  # 10 MB

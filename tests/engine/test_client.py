@@ -125,26 +125,32 @@ from custom_components.xiaomi_mimo_tts.engine.errors import (  # noqa: E402
 )
 from custom_components.xiaomi_mimo_tts.engine.models import VoiceConfig  # noqa: E402
 from tests.fixtures.mimo_responses import (  # noqa: E402
+    make_pcm_bytes,
     make_wav_bytes,
-    synth_response_payload,
-    synth_sse_chunks,
+    synth_sse_body,
 )
+
+
+def _mock_synth_ok(mock_http: aioresponses, pcm: bytes) -> None:
+    """Queue one successful synthesis response (SSE, as synthesize() reads it)."""
+    mock_http.post(
+        "https://api.xiaomimimo.com/v1/chat/completions",
+        status=200,
+        body=synth_sse_body([pcm]),
+        headers={"Content-Type": "text/event-stream"},
+    )
 
 
 @pytest.mark.asyncio
 async def test_synthesize_built_in_returns_wav_bytes(
     aiohttp_session: aiohttp.ClientSession, mock_http: aioresponses
 ) -> None:
-    wav = make_wav_bytes()
-    mock_http.post(
-        "https://api.xiaomimimo.com/v1/chat/completions",
-        status=200,
-        payload=synth_response_payload(wav),
-    )
+    _mock_synth_ok(mock_http, make_pcm_bytes())
     client = XiaomiMimoClient(aiohttp_session, api_key="sk-test")
     vc = VoiceConfig.for_built_in("Chloe", style="Cheerful")
     result = await client.synthesize("Hello", vc, audio_format="wav")
-    assert result.audio_bytes == wav
+    # Byte-identical to what the stdlib wave module writes for the same PCM.
+    assert result.audio_bytes == make_wav_bytes()
     assert result.audio_format == "wav"
     assert result.duration_ms >= 0
 
@@ -153,12 +159,7 @@ async def test_synthesize_built_in_returns_wav_bytes(
 async def test_synthesize_sends_correct_body(
     aiohttp_session: aiohttp.ClientSession, mock_http: aioresponses
 ) -> None:
-    wav = make_wav_bytes()
-    mock_http.post(
-        "https://api.xiaomimimo.com/v1/chat/completions",
-        status=200,
-        payload=synth_response_payload(wav),
-    )
+    _mock_synth_ok(mock_http, make_pcm_bytes())
     client = XiaomiMimoClient(aiohttp_session, api_key="sk-test")
     vc = VoiceConfig.for_built_in("Chloe", style="Cheerful")
     await client.synthesize("Hello", vc, audio_format="wav")
@@ -167,25 +168,20 @@ async def test_synthesize_sends_correct_body(
     request_kwargs = last[1][0].kwargs
     body = request_kwargs["json"]
     assert body["model"] == "mimo-v2.5-tts"
-    assert body["audio"]["format"] == "wav"
+    assert body["audio"]["format"] == "pcm16"
     assert body["audio"]["voice"] == "Chloe"
     assert body["messages"][0]["role"] == "user"
     assert body["messages"][0]["content"] == "Cheerful"
     assert body["messages"][1]["role"] == "assistant"
     assert body["messages"][1]["content"] == "Hello"
-    assert "stream" not in body or body["stream"] is False
+    assert body["stream"] is True
 
 
 @pytest.mark.asyncio
 async def test_synthesize_design_omits_voice_field(
     aiohttp_session: aiohttp.ClientSession, mock_http: aioresponses
 ) -> None:
-    wav = make_wav_bytes()
-    mock_http.post(
-        "https://api.xiaomimimo.com/v1/chat/completions",
-        status=200,
-        payload=synth_response_payload(wav),
-    )
+    _mock_synth_ok(mock_http, make_pcm_bytes())
     client = XiaomiMimoClient(aiohttp_session, api_key="sk-test")
     vc = VoiceConfig.for_design("Young male, warm")
     await client.synthesize("Hi.", vc)
@@ -275,22 +271,17 @@ async def test_synthesize_retries_429_once_with_retry_after(
 ) -> None:
     """First call: 429 with Retry-After: 1 → wait → second call: 200."""
     mocker.patch("asyncio.sleep")
-    wav = make_wav_bytes()
     mock_http.post(
         "https://api.xiaomimimo.com/v1/chat/completions",
         status=429,
         payload={"error": {"message": "rate", "code": "429", "type": "x"}},
         headers={"Retry-After": "1"},
     )
-    mock_http.post(
-        "https://api.xiaomimimo.com/v1/chat/completions",
-        status=200,
-        payload=synth_response_payload(wav),
-    )
+    _mock_synth_ok(mock_http, make_pcm_bytes())
     client = XiaomiMimoClient(aiohttp_session, api_key="sk-test")
     vc = VoiceConfig.for_built_in("Chloe")
     result = await client.synthesize("Hi", vc)
-    assert result.audio_bytes == wav
+    assert result.audio_bytes == make_wav_bytes()
 
 
 @pytest.mark.asyncio
@@ -300,21 +291,16 @@ async def test_synthesize_retries_5xx_once(
     mocker: pytest_mock.MockerFixture,
 ) -> None:
     mocker.patch("asyncio.sleep")
-    wav = make_wav_bytes()
     mock_http.post(
         "https://api.xiaomimimo.com/v1/chat/completions",
         status=503,
         payload={"error": {"message": "down", "code": "503", "type": "x"}},
     )
-    mock_http.post(
-        "https://api.xiaomimimo.com/v1/chat/completions",
-        status=200,
-        payload=synth_response_payload(wav),
-    )
+    _mock_synth_ok(mock_http, make_pcm_bytes())
     client = XiaomiMimoClient(aiohttp_session, api_key="sk-test")
     vc = VoiceConfig.for_built_in("Chloe")
     result = await client.synthesize("Hi", vc)
-    assert result.audio_bytes == wav
+    assert result.audio_bytes == make_wav_bytes()
 
 
 @pytest.mark.asyncio
@@ -359,12 +345,10 @@ async def test_synthesize_stream_yields_pcm_bytes(
     aiohttp_session: aiohttp.ClientSession, mock_http: aioresponses
 ) -> None:
     pcm_chunks = [b"\x01\x02" * 100, b"\x03\x04" * 100]
-    sse_lines = synth_sse_chunks(pcm_chunks)
-    body = b"".join(sse_lines)
     mock_http.post(
         "https://api.xiaomimimo.com/v1/chat/completions",
         status=200,
-        body=body,
+        body=synth_sse_body(pcm_chunks),
         headers={"Content-Type": "text/event-stream"},
     )
     client = XiaomiMimoClient(aiohttp_session, api_key="sk-test")
@@ -389,3 +373,42 @@ async def test_synthesize_stream_does_not_retry(
     with pytest.raises(XiaomiMimoServerError):
         async for _ in client.synthesize_stream("Hi", vc):
             pass
+
+
+@pytest.mark.asyncio
+async def test_synthesize_pcm16_returns_bare_pcm(
+    aiohttp_session: aiohttp.ClientSession, mock_http: aioresponses
+) -> None:
+    """pcm16 callers get the raw payload with no RIFF header prepended."""
+    pcm = make_pcm_bytes(0.1)
+    _mock_synth_ok(mock_http, pcm)
+    client = XiaomiMimoClient(aiohttp_session, api_key="sk-test")
+    result = await client.synthesize(
+        "Hi", VoiceConfig.for_built_in("Chloe"), audio_format="pcm16"
+    )
+    assert result.audio_bytes == pcm
+    assert result.audio_format == "pcm16"
+
+
+@pytest.mark.asyncio
+async def test_synthesize_stream_reassembles_across_read_chunks(
+    aiohttp_session: aiohttp.ClientSession, mock_http: aioresponses
+) -> None:
+    """Events must survive separators that straddle a 64 KiB read boundary."""
+    # Sizes chosen so the "\n\n" separators land at varied offsets well past
+    # the first read chunk, including inside one.
+    pcm_chunks = [bytes([i % 251]) * (40_000 + i * 997) for i in range(6)]
+    mock_http.post(
+        "https://api.xiaomimimo.com/v1/chat/completions",
+        status=200,
+        body=synth_sse_body(pcm_chunks),
+        headers={"Content-Type": "text/event-stream"},
+    )
+    client = XiaomiMimoClient(aiohttp_session, api_key="sk-test")
+    out = [
+        chunk
+        async for chunk in client.synthesize_stream(
+            "Hi", VoiceConfig.for_built_in("Chloe")
+        )
+    ]
+    assert out == pcm_chunks

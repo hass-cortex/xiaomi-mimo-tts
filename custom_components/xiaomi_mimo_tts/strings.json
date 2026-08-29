@@ -148,8 +148,10 @@
         "data": {
           "request_timeout": "Request timeout (seconds)",
           "streaming_enabled": "Enable streaming",
-          "voice_samples_dir": "Voice samples directory",
-          "default_audio_format": "Default audio format"
+          "voice_samples_dir": "Voice samples directory"
+        },
+        "data_description": {
+          "streaming_enabled": "Only affects built-in voice profiles. Voice design and voice clone are always synthesised in one call, because the API returns their audio in one piece."
         }
       }
     }
@@ -177,9 +179,8 @@
         }
       },
       "last_text": {"name": "Last text"},
-      "last_ttft": {"name": "Last TTFT"},
-      "last_streaming": {"name": "Streaming"},
-      "last_sentence_count": {"name": "Last sentence count"}
+      "last_ttft": {"name": "Last time to first audio"},
+      "last_streaming": {"name": "Streaming"}
     }
   },
   "issues": {

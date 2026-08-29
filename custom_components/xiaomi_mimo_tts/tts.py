@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import AsyncGenerator, AsyncIterator
-from typing import TYPE_CHECKING, Any, NoReturn
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn
 
 from homeassistant.components.tts import (
     TextToSpeechEntity,
@@ -20,27 +20,33 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
     CONF_DEFAULT_STYLE_PROMPT,
+    CONF_STREAMING_ENABLED,
     CONF_SUBENTRY_TYPE,
     CONF_VOICE,
     CONF_VOICE_DESCRIPTION,
     CONF_VOICE_SAMPLE_ID,
     DEFAULT_AUDIO_FORMAT,
+    DEFAULT_STREAMING_ENABLED,
     DOMAIN,
     SUBENTRY_TYPE_BUILT_IN,
     SUBENTRY_TYPE_VOICE_CLONE,
     SUBENTRY_TYPE_VOICE_DESIGN,
 )
+from .engine.audio import BYTES_PER_SECOND, STREAMING_WAV_HEADER
 from .engine.errors import (
     XiaomiMimoAuthError,
     XiaomiMimoBadRequestError,
     XiaomiMimoError,
 )
-from .engine.models import SynthesisResult, TTSCallStats, VoiceConfig
-from .engine.stream import (
-    BYTES_PER_SECOND,
-    STREAMING_WAV_HEADER,
-    WAV_HEADER_SIZE,
-    synthesize_text_stream,
+from .engine.models import (
+    MODEL_BUILT_IN,
+    MODEL_VOICE_CLONE,
+    MODEL_VOICE_DESIGN,
+    ModelId,
+    SynthesisResult,
+    TTSCallStats,
+    VoiceConfig,
+    supports_low_latency_stream,
 )
 from .repairs import create_voice_sample_missing_issue
 from .voice_sample import VoiceSampleError, VoiceSampleResolver
@@ -51,6 +57,24 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 6
+
+
+class _Profile(NamedTuple):
+    """What a subentry type means to the API and to the device registry."""
+
+    model: ModelId
+    device_label: str
+
+
+SUBENTRY_PROFILES: dict[str, _Profile] = {
+    SUBENTRY_TYPE_BUILT_IN: _Profile(MODEL_BUILT_IN, "Xiaomi MiMo v2.5 (built-in)"),
+    SUBENTRY_TYPE_VOICE_DESIGN: _Profile(
+        MODEL_VOICE_DESIGN, "Xiaomi MiMo v2.5 (voice design)"
+    ),
+    SUBENTRY_TYPE_VOICE_CLONE: _Profile(
+        MODEL_VOICE_CLONE, "Xiaomi MiMo v2.5 (voice clone)"
+    ),
+}
 
 
 async def async_setup_entry(
@@ -90,12 +114,12 @@ class XiaomiMimoTTSEntity(TextToSpeechEntity):
             entry_type=DeviceEntryType.SERVICE,
         )
 
+    def _profile(self) -> _Profile | None:
+        return SUBENTRY_PROFILES.get(self._subentry.data[CONF_SUBENTRY_TYPE])
+
     def _model_label(self) -> str:
-        return {
-            SUBENTRY_TYPE_BUILT_IN: "Xiaomi MiMo v2.5 (built-in)",
-            SUBENTRY_TYPE_VOICE_DESIGN: "Xiaomi MiMo v2.5 (voice design)",
-            SUBENTRY_TYPE_VOICE_CLONE: "Xiaomi MiMo v2.5 (voice clone)",
-        }.get(self._subentry.data[CONF_SUBENTRY_TYPE], "Xiaomi MiMo v2.5")
+        profile = self._profile()
+        return profile.device_label if profile else "Xiaomi MiMo v2.5"
 
     async def _voice_config_async(self) -> VoiceConfig:
         """Async to allow voice_clone to resolve sample at call time."""
@@ -153,9 +177,9 @@ class XiaomiMimoTTSEntity(TextToSpeechEntity):
             return result.audio_format, result.audio_bytes
         finally:
             duration_ms = (time.monotonic() - start) * 1000.0
-            audio_bytes = len(result.audio_bytes) if result else 0
-            pcm_bytes = max(0, audio_bytes - WAV_HEADER_SIZE)
-            audio_seconds = pcm_bytes / BYTES_PER_SECOND if pcm_bytes else 0.0
+            # PCM only, so the figure means the same on both paths.
+            audio_bytes = result.pcm_bytes if result else 0
+            audio_seconds = result.pcm_bytes / BYTES_PER_SECOND if result else 0.0
             self._push_stats(
                 TTSCallStats(
                     success=success,
@@ -166,8 +190,9 @@ class XiaomiMimoTTSEntity(TextToSpeechEntity):
                     text=message,
                     text_chars=len(message),
                     streaming=False,
-                    ttft_ms=None,
-                    sentence_count=None,
+                    # Nothing can play until the whole clip is back, so the
+                    # wait before audio starts is the whole call.
+                    ttft_ms=duration_ms if success else None,
                 )
             )
 
@@ -191,6 +216,20 @@ class XiaomiMimoTTSEntity(TextToSpeechEntity):
             except Exception:
                 _LOGGER.exception("Sensor push failed")
 
+    def async_supports_streaming_input(self) -> bool:
+        """Advertise streaming input only where there is streaming behind it.
+
+        The base class infers support from the mere presence of an
+        `async_stream_tts_audio` override, which knows about neither the
+        entry-level switch nor the model's streaming mode.
+        """
+        if not self._entry.options.get(
+            CONF_STREAMING_ENABLED, DEFAULT_STREAMING_ENABLED
+        ):
+            return False
+        profile = self._profile()
+        return profile is not None and supports_low_latency_stream(profile.model)
+
     async def async_stream_tts_audio(
         self, request: TTSAudioRequest
     ) -> TTSAudioResponse:
@@ -201,16 +240,10 @@ class XiaomiMimoTTSEntity(TextToSpeechEntity):
         yield STREAMING_WAV_HEADER
         start = time.monotonic()
         ttft_ms: float | None = None
-        text_buffer: list[str] = []
-        sentence_count = 0
+        text = ""
         pcm_bytes_total = 0
         success = False
         error_kind: str | None = None
-
-        def on_batch(_batch_size: int) -> None:
-            nonlocal sentence_count
-            sentence_count += 1
-
         try:
             try:
                 voice_config = await self._voice_config_async()
@@ -218,18 +251,12 @@ class XiaomiMimoTTSEntity(TextToSpeechEntity):
                 error_kind = "api"
                 self._raise_voice_sample_error(exc)
 
-            async def _wrapped_msgs() -> AsyncIterator[str]:
-                async for chunk in request.message_gen:
-                    text_buffer.append(chunk)
-                    yield chunk
+            # The API takes no incremental input, so the reply has to be whole
+            # before the request can go out.
+            text = "".join([chunk async for chunk in request.message_gen])
 
             try:
-                async for chunk in synthesize_text_stream(
-                    self._client,
-                    _wrapped_msgs(),
-                    voice_config,
-                    on_batch=on_batch,
-                ):
+                async for chunk in self._client.synthesize_stream(text, voice_config):
                     if ttft_ms is None:
                         ttft_ms = (time.monotonic() - start) * 1000.0
                     pcm_bytes_total += len(chunk)
@@ -246,7 +273,6 @@ class XiaomiMimoTTSEntity(TextToSpeechEntity):
                 ) from exc
         finally:
             duration_ms = (time.monotonic() - start) * 1000.0
-            text = "".join(text_buffer)
             audio_seconds = pcm_bytes_total / BYTES_PER_SECOND
             self._push_stats(
                 TTSCallStats(
@@ -259,6 +285,5 @@ class XiaomiMimoTTSEntity(TextToSpeechEntity):
                     text_chars=len(text),
                     streaming=True,
                     ttft_ms=ttft_ms,
-                    sentence_count=sentence_count or None,
                 )
             )

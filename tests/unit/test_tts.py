@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from custom_components.xiaomi_mimo_tts.const import CONF_STREAMING_ENABLED
+from custom_components.xiaomi_mimo_tts.engine.audio import BYTES_PER_SECOND
 from custom_components.xiaomi_mimo_tts.engine.errors import (
     XiaomiMimoApiError,
     XiaomiMimoAuthError,
@@ -13,17 +15,17 @@ from custom_components.xiaomi_mimo_tts.engine.errors import (
 from custom_components.xiaomi_mimo_tts.engine.models import SynthesisResult
 
 
+def make_subentry(kind: str, title: str, **data: object) -> MagicMock:
+    se = MagicMock()
+    se.subentry_id = f"se_{kind}"
+    se.title = title
+    se.data = {"type": kind, **data}
+    return se
+
+
 @pytest.fixture
 def mock_subentry_built_in() -> MagicMock:
-    se = MagicMock()
-    se.subentry_id = "se_built_in"
-    se.title = "Chloe"
-    se.data = {
-        "type": "built_in",
-        "voice": "Chloe",
-        "default_style_prompt": "",
-    }
-    return se
+    return make_subentry("built_in", "Chloe", voice="Chloe", default_style_prompt="")
 
 
 @pytest.mark.asyncio
@@ -39,6 +41,7 @@ async def test_async_get_tts_audio_built_in_returns_wav(
             audio_bytes=b"RIFF...WAV",
             audio_format="wav",
             duration_ms=300.0,
+            pcm_bytes=6,
         )
     )
     fmt, data = await entity.async_get_tts_audio("Hello", "en", {})
@@ -89,12 +92,15 @@ from collections.abc import AsyncIterator
 async def test_async_stream_tts_audio_yields_header_then_pcm(
     mock_config_entry, mock_subentry_built_in
 ) -> None:
-    from custom_components.xiaomi_mimo_tts.engine.stream import STREAMING_WAV_HEADER
+    from custom_components.xiaomi_mimo_tts.engine.audio import STREAMING_WAV_HEADER
     from custom_components.xiaomi_mimo_tts.tts import XiaomiMimoTTSEntity
 
     entity = XiaomiMimoTTSEntity(mock_config_entry, mock_subentry_built_in)
 
+    calls: list[str] = []
+
     async def fake_stream(text, vc):
+        calls.append(text)
         yield b"PCM_PART_1"
         yield b"PCM_PART_2"
 
@@ -102,7 +108,8 @@ async def test_async_stream_tts_audio_yields_header_then_pcm(
     entity._client.synthesize_stream = fake_stream
 
     async def text_gen() -> AsyncIterator[str]:
-        yield "Hello world."
+        yield "First sentence. "
+        yield "Second one too."
 
     request = MagicMock()
     request.message_gen = text_gen()
@@ -119,6 +126,8 @@ async def test_async_stream_tts_audio_yields_header_then_pcm(
     combined = b"".join(out)
     assert b"PCM_PART_1" in combined
     assert b"PCM_PART_2" in combined
+    # One request carrying the whole reply — the API takes no partial input.
+    assert calls == ["First sentence. Second one too."]
 
 
 @pytest.mark.asyncio
@@ -131,9 +140,10 @@ async def test_tts_pushes_stats_after_call(
     entity._client = MagicMock()
     entity._client.synthesize = AsyncMock(
         return_value=SynthesisResult(
-            audio_bytes=b"\x00" * 24_000 * 2,  # 1 second of PCM
+            audio_bytes=b"\x00" * BYTES_PER_SECOND,
             audio_format="wav",
             duration_ms=400.0,
+            pcm_bytes=BYTES_PER_SECOND,  # 1 second of PCM
         )
     )
     received: list = []
@@ -179,3 +189,67 @@ async def test_tts_pushes_stats_on_error(
     assert len(received) == 1
     assert received[0].success is False
     assert received[0].error_kind == "api"
+
+
+@pytest.mark.asyncio
+async def test_streaming_option_gates_streaming_input(
+    mock_config_entry, mock_subentry_built_in
+) -> None:
+    from custom_components.xiaomi_mimo_tts.tts import XiaomiMimoTTSEntity
+
+    entity = XiaomiMimoTTSEntity(mock_config_entry, mock_subentry_built_in)
+    assert entity.async_supports_streaming_input() is True
+
+    mock_config_entry.options = {CONF_STREAMING_ENABLED: False}
+    entity = XiaomiMimoTTSEntity(mock_config_entry, mock_subentry_built_in)
+    assert entity.async_supports_streaming_input() is False
+
+
+@pytest.mark.asyncio
+async def test_compat_mode_profiles_do_not_advertise_streaming(
+    mock_config_entry,
+) -> None:
+    """Voice design and clone return one piece — chopping text is not streaming."""
+    from custom_components.xiaomi_mimo_tts.tts import XiaomiMimoTTSEntity
+
+    for kind, data in (
+        ("voice_design", {"voice_description": "a warm voice"}),
+        ("voice_clone", {"voice_sample_id": "media-source://x"}),
+    ):
+        subentry = make_subentry(kind, kind, **data)
+        entity = XiaomiMimoTTSEntity(mock_config_entry, subentry)
+        assert entity.async_supports_streaming_input() is False, kind
+
+
+@pytest.mark.asyncio
+async def test_non_streaming_call_reports_the_wait_before_audio(
+    mock_config_entry, mock_subentry_built_in
+) -> None:
+    """A one-shot synthesis has no audio until it returns, so that is its TTFT."""
+    from custom_components.xiaomi_mimo_tts.tts import XiaomiMimoTTSEntity
+
+    entity = XiaomiMimoTTSEntity(mock_config_entry, mock_subentry_built_in)
+    entity._client = MagicMock()
+    entity._client.synthesize = AsyncMock(
+        return_value=SynthesisResult(
+            audio_bytes=b"RIFF...WAV",
+            audio_format="wav",
+            duration_ms=300.0,
+            pcm_bytes=6,
+        )
+    )
+    received: list = []
+
+    class FakeSensor:
+        def handle_call(self, stats):
+            received.append(stats)
+
+    mock_config_entry.runtime_data.sensors_by_subentry = {
+        mock_subentry_built_in.subentry_id: [FakeSensor()]
+    }
+    await entity.async_get_tts_audio("Hi", "en", {})
+    stats = received[0]
+    assert stats.streaming is False
+    assert stats.ttft_ms == stats.duration_ms
+    # PCM only — the streaming path reports the same way.
+    assert stats.audio_bytes == 6

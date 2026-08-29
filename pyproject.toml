@@ -16,7 +16,7 @@ classifiers = [
     "Topic :: Home Automation",
     "Topic :: Multimedia :: Sound/Audio :: Speech",
 ]
-dependencies = ["sentence-stream>=1.2.1,<2"]
+dependencies = []
 
 [build-system]
 requires = ["setuptools>=82.0.1"]

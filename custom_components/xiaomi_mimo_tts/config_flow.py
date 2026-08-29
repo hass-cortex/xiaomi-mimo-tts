@@ -28,7 +28,6 @@ from .const import (
     BUILT_IN_VOICES,
     CONF_API_KEY,
     CONF_BASE_URL,
-    CONF_DEFAULT_AUDIO_FORMAT,
     CONF_DEFAULT_STYLE_PROMPT,
     CONF_REQUEST_TIMEOUT,
     CONF_STREAMING_ENABLED,
@@ -37,7 +36,6 @@ from .const import (
     CONF_VOICE_DESCRIPTION,
     CONF_VOICE_SAMPLE_ID,
     CONF_VOICE_SAMPLES_DIR,
-    DEFAULT_AUDIO_FORMAT,
     DEFAULT_BASE_URL,
     DEFAULT_REQUEST_TIMEOUT,
     DEFAULT_STREAMING_ENABLED,
@@ -293,6 +291,12 @@ class VoiceCloneSubentryFlow(ConfigSubentryFlow):
             return await self.async_step_upload()
         return await self.async_step_pick()
 
+    @property
+    def _samples_dir(self) -> str:
+        return self._get_entry().options.get(
+            CONF_VOICE_SAMPLES_DIR, DEFAULT_VOICE_SAMPLES_DIR
+        )
+
     async def async_step_upload(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
@@ -306,7 +310,7 @@ class VoiceCloneSubentryFlow(ConfigSubentryFlow):
                 self.hass,
                 file_id=user_input["audio_file"],
                 mime="audio/mpeg",
-                voice_samples_dir=DEFAULT_VOICE_SAMPLES_DIR,
+                voice_samples_dir=self._samples_dir,
                 save_as=save_as,
             )
         except ValueError:
@@ -320,7 +324,7 @@ class VoiceCloneSubentryFlow(ConfigSubentryFlow):
     async def async_step_pick(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        samples = await list_existing_samples(self.hass)
+        samples = await list_existing_samples(self.hass, dir_path=self._samples_dir)
         if not samples:
             return self.async_abort(reason="no_samples_found")
         if user_input is None:
@@ -461,9 +465,6 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Required(CONF_REQUEST_TIMEOUT, default=DEFAULT_REQUEST_TIMEOUT): int,
         vol.Required(CONF_STREAMING_ENABLED, default=DEFAULT_STREAMING_ENABLED): bool,
         vol.Required(CONF_VOICE_SAMPLES_DIR, default=DEFAULT_VOICE_SAMPLES_DIR): str,
-        vol.Required(CONF_DEFAULT_AUDIO_FORMAT, default=DEFAULT_AUDIO_FORMAT): vol.In(
-            ["wav", "pcm16"]
-        ),
     }
 )
 

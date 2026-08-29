@@ -9,35 +9,13 @@ import wave
 
 def make_wav_bytes(duration_seconds: float = 1.0, sample_rate: int = 24_000) -> bytes:
     """Build a tiny silence WAV (24kHz mono int16) for tests."""
-    n_samples = int(duration_seconds * sample_rate)
     buf = io.BytesIO()
     with wave.open(buf, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(sample_rate)
-        w.writeframes(b"\x00\x00" * n_samples)
+        w.writeframes(make_pcm_bytes(duration_seconds, sample_rate))
     return buf.getvalue()
-
-
-def synth_response_payload(audio_bytes: bytes) -> dict:  # type: ignore[type-arg]
-    """Wrap raw audio in the Xiaomi MiMo /chat/completions JSON envelope."""
-    return {
-        "id": "test_completion_id",
-        "choices": [
-            {
-                "finish_reason": "stop",
-                "index": 0,
-                "message": {
-                    "content": "",
-                    "role": "assistant",
-                    "audio": {
-                        "id": "test_audio_id",
-                        "data": base64.b64encode(audio_bytes).decode("ascii"),
-                    },
-                },
-            }
-        ],
-    }
 
 
 # Sample SSE chunks for streaming tests (each line is one delta event)
@@ -53,3 +31,13 @@ def synth_sse_chunks(pcm_chunks: list[bytes]) -> list[bytes]:
         out.append(line.encode("ascii"))
     out.append(b"data: [DONE]\n\n")
     return out
+
+
+def make_pcm_bytes(duration_seconds: float = 1.0, sample_rate: int = 24_000) -> bytes:
+    """Raw 24kHz mono int16 silence — the payload `make_wav_bytes` wraps."""
+    return b"\x00\x00" * int(duration_seconds * sample_rate)
+
+
+def synth_sse_body(pcm_chunks: list[bytes]) -> bytes:
+    """Join `synth_sse_chunks` into a single SSE response body."""
+    return b"".join(synth_sse_chunks(pcm_chunks))
