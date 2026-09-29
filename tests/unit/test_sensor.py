@@ -64,6 +64,17 @@ def test_total_audio_minutes_accumulates_only_on_success() -> None:
     assert desc.update_fn(1.0, _err_stats()) == 1.0
 
 
+def test_total_audio_minutes_does_not_drift_over_short_clips() -> None:
+    from custom_components.xiaomi_mimo_tts.sensor import SENSOR_DESCRIPTIONS
+
+    desc = next(d for d in SENSOR_DESCRIPTIONS if d.key == "total_audio_minutes")
+    s = _ok_stats(audio_bytes=BYTES_PER_SECOND // 4)  # 0.25 s per clip
+    total = None
+    for _ in range(100):
+        total = desc.update_fn(total, s)
+    assert total == pytest.approx(25 / 60)
+
+
 def test_last_text_truncates_long_state() -> None:
     from custom_components.xiaomi_mimo_tts.sensor import SENSOR_DESCRIPTIONS
 

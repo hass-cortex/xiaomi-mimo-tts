@@ -157,8 +157,9 @@ SENSOR_DESCRIPTIONS: tuple[XiaomiMimoSensorDescription, ...] = (
         suggested_display_precision=1,
         state_class=SensorStateClass.TOTAL_INCREASING,
         entity_category=EntityCategory.DIAGNOSTIC,
-        update_fn=lambda cur, s: round(
-            float(cur or 0) + (s.audio_seconds / 60 if s.success else 0), 2
+        # Accumulate unrounded; rounding a running total drifts per clip.
+        update_fn=lambda cur, s: (
+            float(cur or 0) + (s.audio_seconds / 60 if s.success else 0)
         ),
     ),
     XiaomiMimoSensorDescription(
