@@ -61,7 +61,7 @@ custom_components/xiaomi_mimo_tts/
 ## Development Commands
 
 ```bash
-uv sync                                    # Install all deps
+uv sync --group dev --group test           # Install all deps
 uv run pytest tests/ -v                    # Run all tests (engine + unit)
 uv run pytest tests/engine/ -v             # Pure engine tests (no HA mocking)
 uv run pytest tests/unit/ -v               # HA-mocked shell tests
@@ -76,7 +76,7 @@ uv run cz bump --prerelease beta           # Version bump for beta release
 
 - **`tests/engine/`** — pure tests against the HA-decoupled engine. `tests/engine/conftest.py` adds `aiohttp_session` + `aioresponses` fixtures only; no HA mocking.
 - **`tests/unit/`** — HA-mocked tests for shell modules. `tests/conftest.py` (root) injects mock `homeassistant.*` into `sys.modules` before any test imports.
-- Coverage threshold: 70% (`fail_under` in pyproject.toml). Current actual: ~82%.
+- Coverage threshold: 70% (`fail_under` in pyproject.toml).
 
 ## Conventions
 
