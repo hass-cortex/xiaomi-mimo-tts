@@ -88,6 +88,7 @@ uv run cz bump --prerelease beta           # Version bump for beta release
 - **Type annotations**: required on all public functions. Use `TYPE_CHECKING` guard for HA imports (engine never imports HA at all).
 - **Error handling**: engine errors extend `Exception`. The HA shell translates them at the boundary (`tts.py`). `synthesize` retries once on 429/5xx/connection errors — it buffers the whole clip before returning, so a replay is invisible to the caller; `synthesize_stream` does NOT retry (would corrupt yielded byte order).
 - **Translations**: `strings.json` is source of truth. `translations/en.json` must be kept in sync (byte-identical). When modifying schemas, also update both translation files for any new field labels.
+- **Keep the `reauth_successful` / `reconfigure_successful` abort strings** (config and every subentry type) while `hacs.json` allows HA < 2026.10: those cores look them up in this domain and show the raw key when missing. From 2026.10 core supplies them itself.
 
 ## Known Issues
 
