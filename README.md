@@ -137,11 +137,3 @@ After the integration is installed via HACS, switch to the latest `main` branch 
 6. Restart HA
 
 To revert, run the same action with a release tag instead of `main`.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and contribution guidelines.
-
-## License
-
-[MIT](LICENSE)
