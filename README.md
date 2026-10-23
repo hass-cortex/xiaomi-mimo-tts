@@ -1,7 +1,7 @@
 # Xiaomi MiMo TTS for Home Assistant
 
 [![GitHub Release](https://img.shields.io/github/v/release/hass-cortex/xiaomi-mimo-tts)](https://github.com/hass-cortex/xiaomi-mimo-tts/releases)
-[![HACS](https://img.shields.io/badge/HACS-Custom-blue.svg)](https://hacs.xyz/)
+[![HACS](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://hacs.xyz/)
 [![HA Version](https://img.shields.io/badge/HA-2026.3.0+-green.svg)](https://www.home-assistant.io/)
 [![GitHub License](https://img.shields.io/github/license/hass-cortex/xiaomi-mimo-tts)](https://github.com/hass-cortex/xiaomi-mimo-tts/blob/main/LICENSE)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/hass-cortex/xiaomi-mimo-tts)
@@ -30,7 +30,7 @@ Reply text ──► Xiaomi MiMo API ──► Audio ──► Media player
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=hass-cortex&repository=xiaomi-mimo-tts&category=integration)
 
-Click the button above, or manually: HACS > three-dot menu > **Custom repositories** > add `https://github.com/hass-cortex/xiaomi-mimo-tts` (Integration) > install > restart HA.
+Click the button above, or manually: **HACS** > search "Xiaomi MiMo TTS" > **Download** > restart HA.
 
 <details>
 <summary>Manual installation</summary>
