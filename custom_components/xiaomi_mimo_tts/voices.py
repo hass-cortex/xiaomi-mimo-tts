@@ -117,5 +117,4 @@ def profile_device_info(
         model=kind.device_label if kind else "Xiaomi MiMo v2.5",
         name=subentry.title,
         entry_type=DeviceEntryType.SERVICE,
-        via_device=(DOMAIN, entry.entry_id),
     )
