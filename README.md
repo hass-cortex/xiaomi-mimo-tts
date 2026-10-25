@@ -55,7 +55,7 @@ Enter your **API key**. The integration validates against `GET /v1/models` (free
 
 ### 4. Add a Voice Profile
 
-The integration creates one TTS entity, whose voices are the built-in ones (`Chloe`, `Mia`, `Milo`, `Dean`, `冰糖`, `茉莉`, `苏打`, `白桦`, `mimo_default`) and every voice profile you add. Click **Add built-in voice**, **Add designed voice**, or **Add cloned voice** on the integration card to add one; each profile gets a device with 14 diagnostic sensors that count the calls its voice spoke, plus a Voice sensor for built-in and clone profiles.
+The integration creates one TTS entity, whose voices are the built-in ones (`Chloe`, `Mia`, `Milo`, `Dean`, `冰糖`, `茉莉`, `苏打`, `白桦`, `mimo_default`) and every voice profile you add. Click **Add built-in voice**, **Add designed voice**, or **Add cloned voice** on the integration card to add one; each profile gets a device with 14 diagnostic sensors that count the calls its voice spoke, plus a Voice sensor for built-in and clone profiles. A profile's name is how the voice picker shows it: left blank, a built-in profile goes by its voice and a cloned one by its sample's file name.
 
 | Type                   | What it does                                                                                                  |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------- |

@@ -356,3 +356,35 @@ async def test_voice_clone_uses_the_configured_samples_dir(mock_hass) -> None:
     ):
         await flow.async_step_pick(None)
     assert lister.await_args.kwargs["dir_path"] == "/media/custom_dir"
+
+
+@pytest.mark.asyncio
+async def test_unnamed_built_in_profile_goes_by_its_voice(mock_hass) -> None:
+    """A profile is a voice in the picker; a stock title would say nothing."""
+    from custom_components.xiaomi_mimo_tts.config_flow import BuiltInSubentryFlow
+
+    flow = BuiltInSubentryFlow()
+    flow.hass = mock_hass
+    flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+    await flow.async_step_user(
+        {"name": "  ", "voice": "茉莉", "default_style_prompt": ""}
+    )
+    assert flow.async_create_entry.call_args.kwargs["title"] == "茉莉"
+
+
+@pytest.mark.asyncio
+async def test_unnamed_clone_profile_goes_by_its_sample(mock_hass) -> None:
+    from custom_components.xiaomi_mimo_tts.config_flow import VoiceCloneSubentryFlow
+
+    flow = VoiceCloneSubentryFlow()
+    flow.hass = mock_hass
+    flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+    flow._get_entry = MagicMock(return_value=MagicMock(options={}))
+    sample = "media-source://media_source/local/voice_samples/灣灣小何.mp3"
+    with patch(
+        "custom_components.xiaomi_mimo_tts.config_flow.list_existing_samples",
+        new=AsyncMock(return_value=[{"label": "灣灣小何.mp3", "value": sample}]),
+    ):
+        await flow.async_step_user({"name": "", "sample_source": "existing"})
+        await flow.async_step_pick({"voice_sample_id": sample})
+    assert flow.async_create_entry.call_args.kwargs["title"] == "灣灣小何"

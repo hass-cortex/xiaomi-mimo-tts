@@ -52,9 +52,12 @@
         "user": {
           "title": "Built-in voice",
           "data": {
-            "name": "Profile name",
+            "name": "Profile name (optional)",
             "voice": "Voice",
             "default_style_prompt": "Default style prompt (optional)"
+          },
+          "data_description": {
+            "name": "How the voice picker shows this profile. Leave blank to use the voice's name."
           }
         },
         "reconfigure": {
@@ -106,8 +109,11 @@
           "title": "Voice clone",
           "description": "Provide an audio sample to clone.",
           "data": {
-            "name": "Profile name",
+            "name": "Profile name (optional)",
             "sample_source": "Sample source"
+          },
+          "data_description": {
+            "name": "How the voice picker shows this profile. Leave blank to use the sample's file name."
           }
         },
         "upload": {

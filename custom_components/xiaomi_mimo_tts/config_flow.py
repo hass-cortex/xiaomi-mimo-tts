@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from pathlib import PurePosixPath
 from typing import Any
 
 import voluptuous as vol
@@ -104,7 +105,7 @@ async def _validate_api_key(
 
 BUILT_IN_SCHEMA = vol.Schema(
     {
-        vol.Required("name", default="Xiaomi MiMo Built-in"): str,
+        vol.Optional("name", default=""): str,
         vol.Required(CONF_VOICE, default="冰糖"): _VOICE_SELECTOR,
         vol.Optional(CONF_DEFAULT_STYLE_PROMPT, default=""): str,
     }
@@ -120,7 +121,8 @@ class BuiltInSubentryFlow(ConfigSubentryFlow):
         if user_input is None:
             return self.async_show_form(step_id="user", data_schema=BUILT_IN_SCHEMA)
         return self.async_create_entry(
-            title=user_input["name"],
+            # A profile is a voice in the voice picker; unnamed, it goes by its voice.
+            title=user_input.get("name", "").strip() or user_input[CONF_VOICE],
             data={
                 CONF_SUBENTRY_TYPE: SUBENTRY_TYPE_BUILT_IN,
                 CONF_VOICE: user_input[CONF_VOICE],
@@ -172,7 +174,7 @@ class BuiltInSubentryFlow(ConfigSubentryFlow):
 
 VOICE_DESIGN_SCHEMA = vol.Schema(
     {
-        vol.Required("name", default="Xiaomi MiMo Designed Voice"): str,
+        vol.Required("name"): str,
         vol.Required(CONF_VOICE_DESCRIPTION): str,
     }
 )
@@ -222,7 +224,7 @@ class VoiceDesignSubentryFlow(ConfigSubentryFlow):
 
 VOICE_CLONE_SOURCE_SCHEMA = vol.Schema(
     {
-        vol.Required("name", default="Xiaomi MiMo Cloned Voice"): str,
+        vol.Optional("name", default=""): str,
         vol.Required("sample_source", default="upload"): vol.In(["upload", "existing"]),
     }
 )
@@ -269,7 +271,7 @@ class VoiceCloneSubentryFlow(ConfigSubentryFlow):
             return self.async_show_form(
                 step_id="user", data_schema=VOICE_CLONE_SOURCE_SCHEMA
             )
-        self._chosen_name = user_input["name"]
+        self._chosen_name = user_input.get("name", "").strip()
         if user_input["sample_source"] == "upload":
             return await self.async_step_upload()
         return await self.async_step_pick()
@@ -355,7 +357,9 @@ class VoiceCloneSubentryFlow(ConfigSubentryFlow):
                 title=self._chosen_name,
                 data=entry_data,
             )
-        return self.async_create_entry(title=self._chosen_name, data=entry_data)
+        # A profile is a voice in the voice picker; unnamed, it goes by its sample.
+        title = self._chosen_name or PurePosixPath(voice_sample_id).stem
+        return self.async_create_entry(title=title, data=entry_data)
 
 
 class XiaomiMimoTTSConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]

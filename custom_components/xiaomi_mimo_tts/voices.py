@@ -7,6 +7,8 @@ its profile, and a built-in profile is a built-in voice with a style prompt.
 
 from __future__ import annotations
 
+from collections import Counter
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, NamedTuple
 
 from homeassistant.config_entries import ConfigSubentry
@@ -16,6 +18,8 @@ from .const import (
     BUILT_IN_VOICES,
     CONF_DEFAULT_VOICE,
     CONF_SUBENTRY_TYPE,
+    CONF_VOICE,
+    CONF_VOICE_SAMPLE_ID,
     DEFAULT_VOICE,
     DOMAIN,
     SUBENTRY_TYPE_BUILT_IN,
@@ -63,10 +67,41 @@ class VoiceChoice(NamedTuple):
     """The built-in voice when no profile speaks."""
 
 
+_BUILT_IN_LABELS = {"mimo_default": "MiMo default"}
+
+
+def _profile_detail(subentry: ConfigSubentry) -> str:
+    """What tells a profile apart from another of the same title."""
+    data = subentry.data
+    kind = data[CONF_SUBENTRY_TYPE]
+    if kind == SUBENTRY_TYPE_BUILT_IN:
+        # Named after its voice, it clashes with that very built-in voice.
+        return "profile" if subentry.title == data[CONF_VOICE] else data[CONF_VOICE]
+    if kind == SUBENTRY_TYPE_VOICE_CLONE:
+        return PurePosixPath(data[CONF_VOICE_SAMPLE_ID]).stem
+    return "design"
+
+
 def entry_voices(entry: XiaomiMimoTTSConfigEntry) -> list[tuple[str, str]]:
-    """The entry's voices as (voice ID, name): built-in ones, then the profiles."""
-    return [(name, name) for name in BUILT_IN_VOICES] + [
-        (subentry.subentry_id, subentry.title) for subentry in entry.subentries.values()
+    """The entry's voices as (voice ID, name): built-in ones, then the profiles.
+
+    A profile whose title another voice also has is named with what sets it
+    apart (its built-in voice or sample), so the voice picker never shows two
+    voices alike.
+    """
+    built_in = [(name, _BUILT_IN_LABELS.get(name, name)) for name in BUILT_IN_VOICES]
+    profiles = list(entry.subentries.values())
+    titles = Counter(
+        [name for _, name in built_in] + [subentry.title for subentry in profiles]
+    )
+    return built_in + [
+        (
+            subentry.subentry_id,
+            subentry.title
+            if titles[subentry.title] == 1
+            else f"{subentry.title} ({_profile_detail(subentry)})",
+        )
+        for subentry in profiles
     ]
 
 
