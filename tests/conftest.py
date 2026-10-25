@@ -218,6 +218,7 @@ _ha_config_entries.ConfigEntryNotReady = _ha_exceptions.ConfigEntryNotReady
 # ── homeassistant.helpers.entity_registry ────────────────────────────────────
 
 _ha_helpers_er.async_get = MagicMock()
+_ha_helpers_er.async_entries_for_config_entry = MagicMock(return_value=[])
 _ha_helpers_er.EVENT_ENTITY_REGISTRY_UPDATED = "entity_registry_updated"
 
 # ── homeassistant.helpers.area_registry ──────────────────────────────────────
@@ -382,6 +383,16 @@ _ha_components_tts.TextToSpeechEntity = type(
     },
 )
 _ha_components_tts.TtsAudioType = MagicMock
+_ha_components_tts.ATTR_VOICE = "voice"
+
+
+@_dataclass(frozen=True)
+class _MockVoice:
+    voice_id: str
+    name: str
+
+
+_ha_components_tts.Voice = _MockVoice
 _ha_components_tts.SampleRate = MagicMock()
 _ha_components_tts.SampleRate.SAMPLERATE_24000 = 24000
 

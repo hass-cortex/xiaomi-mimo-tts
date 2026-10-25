@@ -263,27 +263,58 @@ async def test_reconfigure_step_renders_form(mock_hass) -> None:
 
 
 @pytest.mark.asyncio
-async def test_options_flow_creates_entry(mock_hass) -> None:
+async def test_options_flow_keeps_options_it_does_not_show(
+    mock_hass, mock_config_entry
+) -> None:
+    """Saving the options must not drop the base URL that reconfigure set."""
     from custom_components.xiaomi_mimo_tts.config_flow import XiaomiMimoTTSOptionsFlow
 
+    mock_config_entry.options = {"base_url": "https://proxy.example/v1"}
     flow = XiaomiMimoTTSOptionsFlow()
     flow.hass = mock_hass
+    flow.config_entry = mock_config_entry
     flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
-    flow.async_show_form = MagicMock(return_value={"type": "form"})
 
-    # Form path
-    form_result = await flow.async_step_init(None)
-    assert form_result == {"type": "form"}
-
-    # Submit path
-    submit_result = await flow.async_step_init(
+    await flow.async_step_init(
         {
+            "default_voice": "Chloe",
             "request_timeout": 90,
             "streaming_enabled": False,
             "voice_samples_dir": "/media/x",
         }
     )
-    assert submit_result == {"type": "create_entry"}
+    data = flow.async_create_entry.call_args.kwargs["data"]
+    assert data["base_url"] == "https://proxy.example/v1"
+    assert data["default_voice"] == "Chloe"
+
+
+@pytest.mark.asyncio
+async def test_options_flow_offers_profiles_as_the_default_voice(
+    mock_hass, mock_config_entry
+) -> None:
+    from custom_components.xiaomi_mimo_tts.config_flow import XiaomiMimoTTSOptionsFlow
+
+    profile = MagicMock(
+        subentry_id="se_warm", title="Warm", data={"type": "voice_design"}
+    )
+    mock_config_entry.subentries = {"se_warm": profile}
+    mock_config_entry.options = {"default_voice": "se_warm"}
+    flow = XiaomiMimoTTSOptionsFlow()
+    flow.hass = mock_hass
+    flow.config_entry = mock_config_entry
+
+    with patch(
+        "custom_components.xiaomi_mimo_tts.config_flow.SelectSelectorConfig"
+    ) as config:
+        result = await flow.async_step_init(None)
+    assert result["type"] == "form"
+    options = config.call_args.kwargs["options"]
+    assert {"value": "se_warm", "label": "Warm"} in options
+    assert {"value": "冰糖", "label": "冰糖"} in options
+    default = next(
+        k.default() for k in result["data_schema"].schema if k == "default_voice"
+    )
+    assert default == "se_warm"
 
 
 @pytest.mark.asyncio

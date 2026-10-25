@@ -20,5 +20,6 @@ class XiaomiMimoTTSRuntimeData:
         default_factory=OrderedDict
     )
     """LRU map: media_content_id → (base64_data_uri, mtime, resolved_path_str)."""
-    sensors_by_subentry: dict[str, list[Any]] = field(default_factory=dict)
-    """subentry_id → list of XiaomiMimoSensor (registered after async_added_to_hass)."""
+    sensors_by_device: dict[str, list[Any]] = field(default_factory=dict)
+    """entry_id (every call) or subentry_id (the calls a profile spoke) → list of
+    XiaomiMimoSensor, registered after async_added_to_hass."""

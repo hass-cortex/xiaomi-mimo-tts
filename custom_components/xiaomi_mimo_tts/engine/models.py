@@ -115,3 +115,6 @@ class TTSCallStats:
     text_chars: int
     streaming: bool
     ttft_ms: float | None
+    voice: str = ""
+    """The name of the voice that spoke; empty when the call named a voice
+    there is none of."""

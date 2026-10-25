@@ -96,12 +96,6 @@ def test_last_result_classifies_kind() -> None:
     assert desc.update_fn(None, _err_stats(kind="api")) == "api_error"
 
 
-def test_sensor_descriptions_count() -> None:
-    from custom_components.xiaomi_mimo_tts.sensor import SENSOR_DESCRIPTIONS
-
-    assert len(SENSOR_DESCRIPTIONS) == 14
-
-
 def test_last_ttft_clears_on_a_non_streaming_call() -> None:
     """A profile that stopped streaming must not keep reporting an old TTFT."""
     from custom_components.xiaomi_mimo_tts.sensor import SENSOR_DESCRIPTIONS
@@ -110,3 +104,45 @@ def test_last_ttft_clears_on_a_non_streaming_call() -> None:
     streamed = replace(_ok_stats(), streaming=True, ttft_ms=852.4)
     assert desc.update_fn(None, streamed) == 852.4
     assert desc.update_fn(852.4, _ok_stats()) is None
+
+
+def _profile(subentry_id: str, kind: str):
+    from unittest.mock import MagicMock
+
+    return MagicMock(subentry_id=subentry_id, title=subentry_id, data={"type": kind})
+
+
+@pytest.mark.asyncio
+async def test_profile_sensors_keep_their_unique_ids(
+    mock_hass, mock_config_entry
+) -> None:
+    """Their history must survive the move from one TTS entity per profile."""
+    from unittest.mock import MagicMock
+
+    from custom_components.xiaomi_mimo_tts.sensor import async_setup_entry
+
+    mock_config_entry.subentries = {"se_warm": _profile("se_warm", "voice_design")}
+    add = MagicMock()
+    await async_setup_entry(mock_hass, mock_config_entry, add)
+    ids = {e._attr_unique_id for call in add.call_args_list for e in call.args[0]}
+    assert "entry_test_se_warm_requests_total" in ids
+    assert "entry_test_requests_total" in ids
+
+
+@pytest.mark.asyncio
+async def test_entry_device_names_the_last_voice(mock_hass, mock_config_entry) -> None:
+    from unittest.mock import MagicMock
+
+    from custom_components.xiaomi_mimo_tts.sensor import async_setup_entry
+
+    add = MagicMock()
+    await async_setup_entry(mock_hass, mock_config_entry, add)
+    [last_voice] = [
+        e
+        for call in add.call_args_list
+        for e in call.args[0]
+        if e._attr_unique_id == "entry_test_last_voice"
+    ]
+    last_voice.async_write_ha_state = MagicMock()
+    last_voice.handle_call(replace(_ok_stats(), voice="Warm"))
+    assert last_voice._attr_native_value == "Warm"

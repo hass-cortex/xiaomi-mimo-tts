@@ -19,6 +19,7 @@ from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
@@ -29,6 +30,7 @@ from .const import (
     CONF_API_KEY,
     CONF_BASE_URL,
     CONF_DEFAULT_STYLE_PROMPT,
+    CONF_DEFAULT_VOICE,
     CONF_REQUEST_TIMEOUT,
     CONF_STREAMING_ENABLED,
     CONF_SUBENTRY_TYPE,
@@ -52,6 +54,7 @@ from .engine.errors import (
     XiaomiMimoError,
 )
 from .selector import list_existing_samples, save_uploaded_sample
+from .voices import default_voice, entry_voices
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -359,7 +362,7 @@ class XiaomiMimoTTSConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
     """Main config flow."""
 
     VERSION = 1
-    MINOR_VERSION = 1
+    MINOR_VERSION = 2
 
     @staticmethod
     def async_get_options_flow(_config_entry: Any) -> XiaomiMimoTTSOptionsFlow:
@@ -460,13 +463,41 @@ class XiaomiMimoTTSConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         )
 
 
-OPTIONS_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_REQUEST_TIMEOUT, default=DEFAULT_REQUEST_TIMEOUT): int,
-        vol.Required(CONF_STREAMING_ENABLED, default=DEFAULT_STREAMING_ENABLED): bool,
-        vol.Required(CONF_VOICE_SAMPLES_DIR, default=DEFAULT_VOICE_SAMPLES_DIR): str,
-    }
-)
+def _options_schema(entry: Any) -> vol.Schema:
+    """The options form, the default voice offered from the entry's voices."""
+    return vol.Schema(
+        {
+            vol.Required(CONF_DEFAULT_VOICE, default=default_voice(entry)): (
+                SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            SelectOptionDict(value=voice_id, label=name)
+                            for voice_id, name in entry_voices(entry)
+                        ],
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                )
+            ),
+            vol.Required(
+                CONF_REQUEST_TIMEOUT,
+                default=entry.options.get(
+                    CONF_REQUEST_TIMEOUT, DEFAULT_REQUEST_TIMEOUT
+                ),
+            ): int,
+            vol.Required(
+                CONF_STREAMING_ENABLED,
+                default=entry.options.get(
+                    CONF_STREAMING_ENABLED, DEFAULT_STREAMING_ENABLED
+                ),
+            ): bool,
+            vol.Required(
+                CONF_VOICE_SAMPLES_DIR,
+                default=entry.options.get(
+                    CONF_VOICE_SAMPLES_DIR, DEFAULT_VOICE_SAMPLES_DIR
+                ),
+            ): str,
+        }
+    )
 
 
 class XiaomiMimoTTSOptionsFlow(OptionsFlow):
@@ -476,5 +507,11 @@ class XiaomiMimoTTSOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-        return self.async_show_form(step_id="init", data_schema=OPTIONS_SCHEMA)
+            # The form leaves out options it does not show (base_url, set by
+            # reconfigure), so merge rather than replace.
+            return self.async_create_entry(
+                title="", data={**self.config_entry.options, **user_input}
+            )
+        return self.async_show_form(
+            step_id="init", data_schema=_options_schema(self.config_entry)
+        )

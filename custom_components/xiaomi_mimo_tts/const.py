@@ -11,6 +11,7 @@ __all__ = [
     "BUILT_IN_VOICES",
     "CONF_API_KEY",
     "CONF_BASE_URL",
+    "CONF_DEFAULT_VOICE",
     "CONF_DEFAULT_STYLE_PROMPT",
     "CONF_REQUEST_TIMEOUT",
     "CONF_STREAMING_ENABLED",
@@ -23,6 +24,7 @@ __all__ = [
     "DEFAULT_BASE_URL",
     "DEFAULT_REQUEST_TIMEOUT",
     "DEFAULT_STREAMING_ENABLED",
+    "DEFAULT_VOICE",
     "DEFAULT_VOICE_SAMPLES_DIR",
     "DOMAIN",
     "MAX_SAMPLE_BYTES",
@@ -42,11 +44,13 @@ CONF_BASE_URL: Final = "base_url"
 CONF_REQUEST_TIMEOUT: Final = "request_timeout"
 CONF_STREAMING_ENABLED: Final = "streaming_enabled"
 CONF_VOICE_SAMPLES_DIR: Final = "voice_samples_dir"
+CONF_DEFAULT_VOICE: Final = "default_voice"
 
 DEFAULT_REQUEST_TIMEOUT: Final = 60
 DEFAULT_STREAMING_ENABLED: Final = True
 DEFAULT_VOICE_SAMPLES_DIR: Final = "/media/voice_samples"
 DEFAULT_AUDIO_FORMAT: Final = "wav"
+DEFAULT_VOICE: Final = "mimo_default"
 
 # Subentry types
 SUBENTRY_TYPE_BUILT_IN: Final = "built_in"
