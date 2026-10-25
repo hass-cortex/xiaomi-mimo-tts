@@ -68,8 +68,9 @@ async def async_setup_entry(
 class XiaomiMimoTTSEntity(TextToSpeechEntity):
     """One TTS entity per entry; the voice option picks a built-in voice or a profile."""
 
-    _attr_has_entity_name = True
-    _attr_name = None
+    # Home Assistant refuses audio from a TTS entity whose name is None, which
+    # is what has_entity_name with no name of its own would give.
+    _attr_has_entity_name = False
     _attr_supported_languages = ["zh-CN", "zh-TW", "en-US"]
     _attr_default_language = "zh-CN"
 
@@ -78,6 +79,7 @@ class XiaomiMimoTTSEntity(TextToSpeechEntity):
         self._client = entry.runtime_data.client
         self._sample_resolver: VoiceSampleResolver | None = None
         self._attr_unique_id = entry.entry_id
+        self._attr_name = entry.title
         self._attr_device_info = entry_device_info(entry)
 
     @property

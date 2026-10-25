@@ -351,3 +351,13 @@ async def test_compat_mode_voice_on_the_stream_path_arrives_in_one_piece(
     assert entity._client.synthesize.call_args.kwargs["audio_format"] == "pcm16"
     [stats] = received["entry_test"]
     assert (stats.streaming, stats.audio_bytes) == (False, 9)
+
+
+def test_entity_has_a_name(mock_config_entry) -> None:
+    """Home Assistant refuses audio from a TTS entity whose name is None."""
+    from custom_components.xiaomi_mimo_tts.tts import XiaomiMimoTTSEntity
+
+    mock_config_entry.title = "Xiaomi MiMo TTS"
+    entity = XiaomiMimoTTSEntity(mock_config_entry)
+    assert not entity._attr_has_entity_name
+    assert entity._attr_name == "Xiaomi MiMo TTS"
