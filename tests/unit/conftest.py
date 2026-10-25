@@ -33,6 +33,6 @@ def mock_config_entry() -> MagicMock:
     entry.options = {}
     entry.subentries = {}
     entry.runtime_data = MagicMock()
-    entry.runtime_data.sensors_by_subentry = {}
+    entry.runtime_data.sensors_by_device = {}
     entry.runtime_data.voice_sample_cache = {}
     return entry

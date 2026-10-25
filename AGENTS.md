@@ -35,7 +35,8 @@ custom_components/xiaomi_mimo_tts/
 ├── manifest.json            # quality_scale: platinum
 ├── const.py                 # CONF_*, DOMAIN, BUILT_IN_VOICES, MAX_SAMPLE_BYTES
 ├── runtime.py               # XiaomiMimoTTSRuntimeData (client + cache + sensors registry)
-├── tts.py                   # XiaomiMimoTTSEntity — non-streaming + streaming + stats push
+├── tts.py                   # XiaomiMimoTTSEntity — one per entry; non-streaming + streaming + stats push
+├── voices.py                # The entry's voices (built-in + profiles), default voice, device infos
 ├── voice_sample.py          # VoiceSampleResolver — resolve media_content_id → base64
 ├── selector.py              # list_existing_samples + save_uploaded_sample helpers
 ├── sensor.py                # 14 SensorEntityDescriptions + RestoreSensor subclass
@@ -53,10 +54,10 @@ custom_components/xiaomi_mimo_tts/
 
 - **Engine boundary**: `engine/` is pure Python — `XiaomiMimoClient` accepts `aiohttp.ClientSession` via constructor (Dependency Inversion). HA shell passes `async_get_clientsession(hass)`; engine tests pass an `aioresponses`-mocked session.
 - **Error translation at boundary**: `engine/errors.py` defines `XiaomiMimoError` (subclass of `Exception`). The HA shell (`tts.py`) catches `XiaomiMimoAuthError` → `ConfigEntryAuthFailed` (and triggers `entry.async_start_reauth(hass)`); other `XiaomiMimoError` → `HomeAssistantError`.
-- **Subentry-per-voice-profile**: 1 config entry = 1 API key. Each subentry (`built_in` / `voice_design` / `voice_clone`) maps to one Xiaomi MiMo model and produces one HA device + 1 TTS entity + 14 diagnostic sensors (15 for built-in and clone, which add a Voice sensor).
+- **One TTS entity per entry, profiles as voices**: 1 config entry = 1 API key = 1 TTS entity (unique ID = entry ID) on the entry's device. Its voices (`voices.py::entry_voices`) are the built-in voices, by name, and every subentry (`built_in` / `voice_design` / `voice_clone`), by subentry ID; the `voice` option picks one per call, the `default_voice` option covers calls that name none. Each subentry maps to one Xiaomi MiMo model and has a device with 14 diagnostic sensors (15 for built-in and clone, which add a Voice sensor); the entry's device has the same 14 plus Last voice. Until 1.2 each subentry was a TTS entity of its own; `async_migrate_entry` removes those and keeps the profiles' sensor unique IDs.
 - **Voice sample storage**: clones live in `/media/voice_samples/`. Subentries store only a `media_content_id` (small). `VoiceSampleResolver` resolves on demand with mtime-based caching keyed by content_id; the resolver instance is cached on the entity to avoid per-call allocation.
-- **One request per utterance**: the API takes no incremental input — `messages` must carry complete text — so every call sends the whole reply, and the only thing that streams is the response. `tts.py::_stream` drains `request.message_gen`, issues one `synthesize_stream`, prepends the streaming WAV header (sentinel `0xFFFFFFFF` length) and relays PCM chunks as they land. It is only reachable for models `engine.models.supports_low_latency_stream` accepts; `async_supports_streaming_input` returns False for the others so HA routes them through `async_get_tts_audio` instead.
-- **Sensor push updates**: `XiaomiMimoTTSEntity._push_stats(TTSCallStats)` fires after each call (success or failure). Sensors are `RestoreSensor` (state persists across HA restarts) and self-register in `runtime_data.sensors_by_subentry` on `async_added_to_hass`.
+- **One request per utterance**: the API takes no incremental input — `messages` must carry complete text — so every call sends the whole reply, and the only thing that streams is the response. `tts.py::_stream` drains `request.message_gen`, issues one `synthesize_stream`, prepends the streaming WAV header (sentinel `0xFFFFFFFF` length) and relays PCM chunks as they land. `async_supports_streaming_input` follows only the entry switch, since the voice is not known until the call; a voice whose model `engine.models.supports_low_latency_stream` rejects goes through `synthesize` (which may retry) inside `_stream` and its clip follows the header in one chunk.
+- **Sensor push updates**: `XiaomiMimoTTSEntity._push_stats(TTSCallStats)` fires after each call (success or failure). Sensors are `RestoreSensor` (state persists across HA restarts) and self-register in `runtime_data.sensors_by_device` on `async_added_to_hass`, under the entry ID (every call) or a subentry ID (the calls that profile's voice spoke).
 
 ## Development Commands
 

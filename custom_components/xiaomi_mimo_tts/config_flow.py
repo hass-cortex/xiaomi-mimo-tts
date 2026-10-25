@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from pathlib import PurePosixPath
 from typing import Any
 
 import voluptuous as vol
@@ -19,6 +20,7 @@ from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
@@ -29,6 +31,7 @@ from .const import (
     CONF_API_KEY,
     CONF_BASE_URL,
     CONF_DEFAULT_STYLE_PROMPT,
+    CONF_DEFAULT_VOICE,
     CONF_REQUEST_TIMEOUT,
     CONF_STREAMING_ENABLED,
     CONF_SUBENTRY_TYPE,
@@ -52,6 +55,7 @@ from .engine.errors import (
     XiaomiMimoError,
 )
 from .selector import list_existing_samples, save_uploaded_sample
+from .voices import default_voice, entry_voices
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,7 +105,7 @@ async def _validate_api_key(
 
 BUILT_IN_SCHEMA = vol.Schema(
     {
-        vol.Required("name", default="Xiaomi MiMo Built-in"): str,
+        vol.Optional("name", default=""): str,
         vol.Required(CONF_VOICE, default="冰糖"): _VOICE_SELECTOR,
         vol.Optional(CONF_DEFAULT_STYLE_PROMPT, default=""): str,
     }
@@ -117,7 +121,8 @@ class BuiltInSubentryFlow(ConfigSubentryFlow):
         if user_input is None:
             return self.async_show_form(step_id="user", data_schema=BUILT_IN_SCHEMA)
         return self.async_create_entry(
-            title=user_input["name"],
+            # A profile is a voice in the voice picker; unnamed, it goes by its voice.
+            title=user_input.get("name", "").strip() or user_input[CONF_VOICE],
             data={
                 CONF_SUBENTRY_TYPE: SUBENTRY_TYPE_BUILT_IN,
                 CONF_VOICE: user_input[CONF_VOICE],
@@ -169,7 +174,7 @@ class BuiltInSubentryFlow(ConfigSubentryFlow):
 
 VOICE_DESIGN_SCHEMA = vol.Schema(
     {
-        vol.Required("name", default="Xiaomi MiMo Designed Voice"): str,
+        vol.Required("name"): str,
         vol.Required(CONF_VOICE_DESCRIPTION): str,
     }
 )
@@ -219,7 +224,7 @@ class VoiceDesignSubentryFlow(ConfigSubentryFlow):
 
 VOICE_CLONE_SOURCE_SCHEMA = vol.Schema(
     {
-        vol.Required("name", default="Xiaomi MiMo Cloned Voice"): str,
+        vol.Optional("name", default=""): str,
         vol.Required("sample_source", default="upload"): vol.In(["upload", "existing"]),
     }
 )
@@ -266,7 +271,7 @@ class VoiceCloneSubentryFlow(ConfigSubentryFlow):
             return self.async_show_form(
                 step_id="user", data_schema=VOICE_CLONE_SOURCE_SCHEMA
             )
-        self._chosen_name = user_input["name"]
+        self._chosen_name = user_input.get("name", "").strip()
         if user_input["sample_source"] == "upload":
             return await self.async_step_upload()
         return await self.async_step_pick()
@@ -352,14 +357,16 @@ class VoiceCloneSubentryFlow(ConfigSubentryFlow):
                 title=self._chosen_name,
                 data=entry_data,
             )
-        return self.async_create_entry(title=self._chosen_name, data=entry_data)
+        # A profile is a voice in the voice picker; unnamed, it goes by its sample.
+        title = self._chosen_name or PurePosixPath(voice_sample_id).stem
+        return self.async_create_entry(title=title, data=entry_data)
 
 
 class XiaomiMimoTTSConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     """Main config flow."""
 
     VERSION = 1
-    MINOR_VERSION = 1
+    MINOR_VERSION = 2
 
     @staticmethod
     def async_get_options_flow(_config_entry: Any) -> XiaomiMimoTTSOptionsFlow:
@@ -460,13 +467,41 @@ class XiaomiMimoTTSConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         )
 
 
-OPTIONS_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_REQUEST_TIMEOUT, default=DEFAULT_REQUEST_TIMEOUT): int,
-        vol.Required(CONF_STREAMING_ENABLED, default=DEFAULT_STREAMING_ENABLED): bool,
-        vol.Required(CONF_VOICE_SAMPLES_DIR, default=DEFAULT_VOICE_SAMPLES_DIR): str,
-    }
-)
+def _options_schema(entry: Any) -> vol.Schema:
+    """The options form, the default voice offered from the entry's voices."""
+    return vol.Schema(
+        {
+            vol.Required(CONF_DEFAULT_VOICE, default=default_voice(entry)): (
+                SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            SelectOptionDict(value=voice_id, label=name)
+                            for voice_id, name in entry_voices(entry)
+                        ],
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                )
+            ),
+            vol.Required(
+                CONF_REQUEST_TIMEOUT,
+                default=entry.options.get(
+                    CONF_REQUEST_TIMEOUT, DEFAULT_REQUEST_TIMEOUT
+                ),
+            ): int,
+            vol.Required(
+                CONF_STREAMING_ENABLED,
+                default=entry.options.get(
+                    CONF_STREAMING_ENABLED, DEFAULT_STREAMING_ENABLED
+                ),
+            ): bool,
+            vol.Required(
+                CONF_VOICE_SAMPLES_DIR,
+                default=entry.options.get(
+                    CONF_VOICE_SAMPLES_DIR, DEFAULT_VOICE_SAMPLES_DIR
+                ),
+            ): str,
+        }
+    )
 
 
 class XiaomiMimoTTSOptionsFlow(OptionsFlow):
@@ -476,5 +511,11 @@ class XiaomiMimoTTSOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-        return self.async_show_form(step_id="init", data_schema=OPTIONS_SCHEMA)
+            # The form leaves out options it does not show (base_url, set by
+            # reconfigure), so merge rather than replace.
+            return self.async_create_entry(
+                title="", data={**self.config_entry.options, **user_input}
+            )
+        return self.async_show_form(
+            step_id="init", data_schema=_options_schema(self.config_entry)
+        )

@@ -1,4 +1,8 @@
-"""Xiaomi MiMo TTS diagnostic sensors (14 per voice profile)."""
+"""Xiaomi MiMo TTS diagnostic sensors.
+
+The entry's device counts every call; each voice profile's device counts the
+calls its voice spoke.
+"""
 
 from __future__ import annotations
 
@@ -24,11 +28,11 @@ from .const import (
     CONF_SUBENTRY_TYPE,
     CONF_VOICE,
     CONF_VOICE_SAMPLE_ID,
-    DOMAIN,
     SUBENTRY_TYPE_BUILT_IN,
     SUBENTRY_TYPE_VOICE_CLONE,
 )
 from .engine.models import TTSCallStats
+from .voices import entry_device_info, profile_device_info
 
 if TYPE_CHECKING:
     from . import XiaomiMimoTTSConfigEntry
@@ -217,25 +221,48 @@ SENSOR_DESCRIPTIONS: tuple[XiaomiMimoSensorDescription, ...] = (
 )
 
 
+LAST_VOICE_DESCRIPTION = XiaomiMimoSensorDescription(
+    key="last_voice",
+    translation_key="last_voice",
+    name="Last voice",
+    icon="mdi:account-voice",
+    update_fn=lambda cur, s: s.voice or None,
+)
+"""The entry's only: a profile's device has one voice."""
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: XiaomiMimoTTSConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
+    device = entry_device_info(entry)
+    async_add_entities(
+        [
+            XiaomiMimoSensor(entry, entry.entry_id, device, desc)
+            for desc in (*SENSOR_DESCRIPTIONS, LAST_VOICE_DESCRIPTION)
+        ]
+    )
     for subentry in entry.subentries.values():
+        device = profile_device_info(entry, subentry)
         entities: list[Any] = [
-            XiaomiMimoSensor(entry, subentry, desc) for desc in SENSOR_DESCRIPTIONS
+            XiaomiMimoSensor(entry, subentry.subentry_id, device, desc)
+            for desc in SENSOR_DESCRIPTIONS
         ]
         if subentry.data.get(CONF_SUBENTRY_TYPE) in (
             SUBENTRY_TYPE_BUILT_IN,
             SUBENTRY_TYPE_VOICE_CLONE,
         ):
-            entities.append(XiaomiMimoVoiceSensor(entry, subentry))
+            entities.append(XiaomiMimoVoiceSensor(entry, subentry, device))
         async_add_entities(entities, config_subentry_id=subentry.subentry_id)
 
 
 class XiaomiMimoSensor(RestoreSensor):
-    """RestoreSensor that handles per-call stats pushes."""
+    """RestoreSensor that handles per-call stats pushes.
+
+    ``scope_id`` is whose calls it counts: the entry ID for every call, a
+    subentry ID for the calls that profile's voice spoke.
+    """
 
     has_entity_name = True
     entity_description: XiaomiMimoSensorDescription
@@ -244,18 +271,21 @@ class XiaomiMimoSensor(RestoreSensor):
     def __init__(
         self,
         entry: XiaomiMimoTTSConfigEntry,
-        subentry: ConfigSubentry,
+        scope_id: str,
+        device: DeviceInfo,
         description: XiaomiMimoSensorDescription,
     ) -> None:
         self.entity_description = description
         self._entry = entry
-        self._subentry = subentry
+        self._scope_id = scope_id
+        # A profile's sensors keep the unique IDs they had when each profile
+        # was a TTS entity of its own, so their history carries over.
         self._attr_unique_id = (
-            f"{entry.entry_id}_{subentry.subentry_id}_{description.key}"
+            f"{entry.entry_id}_{description.key}"
+            if scope_id == entry.entry_id
+            else f"{entry.entry_id}_{scope_id}_{description.key}"
         )
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry.entry_id}_{subentry.subentry_id}")},
-        )
+        self._attr_device_info = device
         self._attr_extra_state_attributes: dict[str, Any] = {}
         self.duration_history: deque[float] = deque(maxlen=10)
 
@@ -264,14 +294,12 @@ class XiaomiMimoSensor(RestoreSensor):
         last = await self.async_get_last_sensor_data()
         if last is not None and last.native_value is not None:
             self._attr_native_value = last.native_value
-        self._entry.runtime_data.sensors_by_subentry.setdefault(
-            self._subentry.subentry_id, []
+        self._entry.runtime_data.sensors_by_device.setdefault(
+            self._scope_id, []
         ).append(self)
 
     async def async_will_remove_from_hass(self) -> None:
-        registered = self._entry.runtime_data.sensors_by_subentry.get(
-            self._subentry.subentry_id
-        )
+        registered = self._entry.runtime_data.sensors_by_device.get(self._scope_id)
         if registered is not None and self in registered:
             registered.remove(self)
 
@@ -305,14 +333,15 @@ class XiaomiMimoVoiceSensor(SensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(
-        self, entry: XiaomiMimoTTSConfigEntry, subentry: ConfigSubentry
+        self,
+        entry: XiaomiMimoTTSConfigEntry,
+        subentry: ConfigSubentry,
+        device: DeviceInfo,
     ) -> None:
         self._entry = entry
         self._subentry = subentry
         self._attr_unique_id = f"{entry.entry_id}_{subentry.subentry_id}_voice_in_use"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry.entry_id}_{subentry.subentry_id}")},
-        )
+        self._attr_device_info = device
         self._attr_native_value = self._compute_value()
 
     def _compute_value(self) -> str | None:
