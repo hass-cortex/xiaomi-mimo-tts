@@ -117,30 +117,30 @@ Version is tracked in two places, kept in sync by commitizen (`cz bump`):
 | `pyproject.toml` | `[project] version` and `[tool.commitizen] version` |
 | `custom_components/xiaomi_mimo_tts/manifest.json` | `version` |
 
-### HACS Configuration
+### Marketplace Configuration (`hacs.json`)
 
 `hacs.json`:
-- `name` — display name in HACS UI
+- `name` — display name in the Marketplace UI
 - `homeassistant` — minimum HA version (currently `2026.3.0`, required for Python 3.14+)
-- `render_readme` — show README.md directly in HACS detail page (no separate `info.md`)
+- `render_readme` — legacy HACS flag (Marketplace always renders `README.md` from repo root)
 
-### HACS Version Selection Logic
+### Marketplace Version Selection Logic
 
-HACS determines which version to show users based on this priority:
+The Marketplace determines which version to show users based on this priority:
 
-1. `show_beta=true` and prerelease exists → display prerelease tag
+1. Pre-release switch enabled and prerelease exists → display prerelease tag
 2. Stable release exists → display latest stable tag
 3. No releases at all → display default branch `last_commit`
 
-Users can always manually select a specific version (including main branch) via HACS download dialog → "Need a different version?"
+Users can always manually select a specific version (including main branch) via the repository page three-dot menu → "Install another version".
 
 ### Distribution Channels
 
-| Channel | GitHub Release | HACS Behaviour |
-|---------|---------------|----------------|
+| Channel | GitHub Release | Marketplace Behaviour |
+|---------|---------------|-----------------------|
 | **Stable** | Release (`prerelease: false`) | Shown to all users by default |
-| **Beta** | Pre-release (`prerelease: true`) | Only shown when user enables "Pre-release" switch entity per repository |
-| **Dev (main)** | No release needed | Available via "Need a different version?" in download dialog |
+| **Beta** | Pre-release (`prerelease: true`) | Only shown when user enables the "Pre-release" switch entity per repository |
+| **Dev (main)** | No release needed | Available via "Install another version" in the repository menu |
 
 ### Release Workflow
 
@@ -167,14 +167,14 @@ GitHub Actions (`release.yml`) then:
 
 ### Version Naming
 
-HACS uses `AwesomeVersion` for comparison. Tag format follows commitizen's `tag_format = "$version"` (no `v` prefix):
+The Marketplace uses `AwesomeVersion` for comparison. Tag format follows commitizen's `tag_format = "$version"` (no `v` prefix):
 
 | Type | Tag Example | manifest.json version |
 |------|------------|----------------------|
 | Stable | `1.0.0` | `1.0.0` |
 | Beta | `1.1.0b1` | `1.1.0b1` |
 
-HACS only checks GitHub's `prerelease` boolean flag — tag naming does not affect channel routing.
+The Marketplace only checks GitHub's `prerelease` boolean flag — tag naming does not affect channel routing.
 
 ## Do NOT
 

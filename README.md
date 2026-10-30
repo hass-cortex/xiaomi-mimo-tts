@@ -30,7 +30,7 @@ Reply text ──► Xiaomi MiMo API ──► Audio ──► Media player
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=hass-cortex&repository=xiaomi-mimo-tts&category=integration)
 
-Click the button above, or manually: **HACS** > search "Xiaomi MiMo TTS" > **Download** > restart HA.
+Click the button above, or manually: **Settings > Marketplace** > search "Xiaomi MiMo TTS" > **Install** > restart HA.
 
 <details>
 <summary>Manual installation</summary>
@@ -86,7 +86,7 @@ Each voice profile can be reconfigured independently from its three-dot menu (re
 
 ### Uninstallation
 
-**Settings > Devices & Services** > Xiaomi MiMo TTS > three-dot menu > **Delete** > remove `custom_components/xiaomi_mimo_tts/` > restart HA. Voice sample files in your samples directory are not removed automatically.
+**Settings > Devices & Services** > Xiaomi MiMo TTS > three-dot menu > **Delete** > uninstall from **Settings > Marketplace** (or manually remove `custom_components/xiaomi_mimo_tts/`) > restart HA. Voice sample files in your samples directory are not removed automatically.
 
 ## Debugging
 
@@ -130,7 +130,7 @@ The **Last time to first audio** sensor answers this for every call: a streaming
 
 **How do I install the latest development version?**
 
-After the integration is installed via HACS, switch to the latest `main` branch using the `update.install` action:
+After the integration is installed via the Marketplace, switch to the latest `main` branch using the `update.install` action:
 
 1. Go to **Developer Tools > Actions**
 2. Select the `update.install` action
