@@ -1,6 +1,7 @@
 {
   "domain": "xiaomi_mimo_tts",
   "name": "Xiaomi MiMo TTS",
+  "categories": ["ai_voice.speech"],
   "codeowners": ["@parkghost"],
   "config_flow": true,
   "dependencies": ["file_upload"],
