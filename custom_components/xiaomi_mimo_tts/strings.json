@@ -37,9 +37,7 @@
       "unknown": "Unknown error. Check the log."
     },
     "abort": {
-      "already_configured": "This API key is already configured.",
-      "reauth_successful": "Re-authentication was successful.",
-      "reconfigure_successful": "Configuration updated."
+      "already_configured": "This API key is already configured."
     }
   },
   "config_subentries": {
@@ -68,9 +66,6 @@
             "default_style_prompt": "Default style prompt (optional)"
           }
         }
-      },
-      "abort": {
-        "reconfigure_successful": "Voice profile updated."
       }
     },
     "voice_design": {
@@ -94,9 +89,6 @@
             "voice_description": "Voice description"
           }
         }
-      },
-      "abort": {
-        "reconfigure_successful": "Voice profile updated."
       }
     },
     "voice_clone": {
@@ -139,8 +131,7 @@
         }
       },
       "abort": {
-        "no_samples_found": "No voice samples found in /media/voice_samples.",
-        "reconfigure_successful": "Voice profile updated."
+        "no_samples_found": "No voice samples found in /media/voice_samples."
       },
       "error": {
         "invalid_sample": "Invalid audio sample."

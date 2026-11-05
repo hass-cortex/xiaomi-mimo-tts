@@ -9,27 +9,46 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_setup_entry_creates_runtime_data(mock_hass, mock_config_entry) -> None:
-    from custom_components.xiaomi_mimo_tts import async_setup_entry
+    from custom_components.xiaomi_mimo_tts import PLATFORMS, async_setup_entry
     from custom_components.xiaomi_mimo_tts.runtime import XiaomiMimoTTSRuntimeData
 
-    mock_hass.config_entries.async_forward_entry_setups = AsyncMock(return_value=True)
+    mock_hass.config_entries.async_forward_entry_setups = AsyncMock()
     with patch(
         "custom_components.xiaomi_mimo_tts.async_get_clientsession",
         return_value=MagicMock(),
     ):
-        result = await async_setup_entry(mock_hass, mock_config_entry)
-    assert result is True
+        await async_setup_entry(mock_hass, mock_config_entry)
     assert isinstance(mock_config_entry.runtime_data, XiaomiMimoTTSRuntimeData)
+    mock_hass.config_entries.async_forward_entry_setups.assert_awaited_once_with(
+        mock_config_entry, PLATFORMS
+    )
 
 
 @pytest.mark.asyncio
-async def test_unload_entry(mock_hass, mock_config_entry) -> None:
+async def test_unload_entry_unloads_the_platforms(mock_hass, mock_config_entry) -> None:
+    from custom_components.xiaomi_mimo_tts import PLATFORMS, async_unload_entry
+
+    mock_hass.config_entries.async_unload_platforms_or_raise = AsyncMock()
+    await async_unload_entry(mock_hass, mock_config_entry)
+    mock_hass.config_entries.async_unload_platforms_or_raise.assert_awaited_once_with(
+        mock_config_entry, PLATFORMS
+    )
+
+
+@pytest.mark.asyncio
+async def test_unload_entry_fails_when_a_platform_does_not_unload(
+    mock_hass, mock_config_entry
+) -> None:
+    """A failed platform unload must reach core as an error, not a quiet success."""
+    from homeassistant.exceptions import ConfigEntryError
+
     from custom_components.xiaomi_mimo_tts import async_unload_entry
 
-    mock_hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
-    mock_config_entry.runtime_data = MagicMock()
-    result = await async_unload_entry(mock_hass, mock_config_entry)
-    assert result is True
+    mock_hass.config_entries.async_unload_platforms_or_raise = AsyncMock(
+        side_effect=ConfigEntryError("platform unload failed")
+    )
+    with pytest.raises(ConfigEntryError):
+        await async_unload_entry(mock_hass, mock_config_entry)
 
 
 def _registry_entry(entity_id: str, unique_id: str):
@@ -66,7 +85,7 @@ async def test_migration_drops_profile_tts_entities_and_keeps_their_voice(
             return_value=entities,
         ),
     ):
-        assert await async_migrate_entry(mock_hass, mock_config_entry) is True
+        await async_migrate_entry(mock_hass, mock_config_entry)
 
     removed = {c.args[0] for c in registry.async_remove.call_args_list}
     assert removed == {"tts.xiaomi_mimo_built_in", "tts.xiaomi_mimo_designed_voice"}

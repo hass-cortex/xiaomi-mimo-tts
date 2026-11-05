@@ -146,3 +146,31 @@ async def test_entry_device_names_the_last_voice(mock_hass, mock_config_entry) -
     last_voice.async_write_ha_state = MagicMock()
     last_voice.handle_call(replace(_ok_stats(), voice="Warm"))
     assert last_voice._attr_native_value == "Warm"
+
+
+@pytest.mark.asyncio
+async def test_sensor_keeps_counting_after_its_entity_id_changes(
+    mock_hass, mock_config_entry
+) -> None:
+    """Renamed in place, not re-added: it must stay registered for stats pushes."""
+    from unittest.mock import MagicMock
+
+    from custom_components.xiaomi_mimo_tts.sensor import async_setup_entry
+
+    add = MagicMock()
+    await async_setup_entry(mock_hass, mock_config_entry, add)
+    [requests_total] = [
+        e
+        for call in add.call_args_list
+        for e in call.args[0]
+        if e._attr_unique_id == "entry_test_requests_total"
+    ]
+    requests_total.async_write_ha_state = MagicMock()
+    await requests_total.async_added_to_hass()
+
+    requests_total.entity_id = "sensor.mimo_requests_total"
+    requests_total.async_entity_id_changed("sensor.xiaomi_mimo_tts_requests_total")
+
+    for sensor in mock_config_entry.runtime_data.sensors_by_device["entry_test"]:
+        sensor.handle_call(_ok_stats())
+    assert requests_total._attr_native_value == 1

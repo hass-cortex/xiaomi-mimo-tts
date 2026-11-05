@@ -344,6 +344,9 @@ class _MockRestoreSensor:
     async def async_added_to_hass(self) -> None:
         pass
 
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        pass
+
 
 _ha_components_sensor.RestoreSensor = _MockRestoreSensor
 

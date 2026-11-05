@@ -121,7 +121,7 @@ Version is tracked in two places, kept in sync by commitizen (`cz bump`):
 
 `hacs.json`:
 - `name` — display name in the Marketplace UI
-- `homeassistant` — minimum HA version (currently `2026.3.0`, required for Python 3.14+)
+- `homeassistant` — minimum HA version (currently `2026.11.0`: config entry methods return `None`, and entity_id changes apply in place)
 - `render_readme` — legacy HACS flag (Marketplace always renders `README.md` from repo root)
 
 ### Marketplace Version Selection Logic

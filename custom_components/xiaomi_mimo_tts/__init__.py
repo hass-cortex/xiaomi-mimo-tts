@@ -28,7 +28,7 @@ type XiaomiMimoTTSConfigEntry = ConfigEntry[XiaomiMimoTTSRuntimeData]
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: XiaomiMimoTTSConfigEntry
-) -> bool:
+) -> None:
     """Set up Xiaomi MiMo TTS from a config entry."""
     session = async_get_clientsession(hass)
     client = XiaomiMimoClient(
@@ -40,12 +40,11 @@ async def async_setup_entry(
     entry.runtime_data = XiaomiMimoTTSRuntimeData(client=client)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
-    return True
 
 
 async def async_migrate_entry(
     hass: HomeAssistant, entry: XiaomiMimoTTSConfigEntry
-) -> bool:
+) -> None:
     """Bring an entry up to the current version.
 
     1.1 → 1.2: each voice profile was a TTS entity of its own; now the entry
@@ -53,9 +52,10 @@ async def async_migrate_entry(
     the default voice becomes the first built-in profile (else the first
     profile), so the new entity speaks as the one a pipeline most likely used.
     Their devices and sensors stay.
+
+    Core refuses an entry whose major version is newer than the flow's before
+    calling this, so only minor steps arrive here.
     """
-    if entry.version > 1:
-        return False
     if entry.minor_version < 2:
         registry = er.async_get(hass)
         for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
@@ -69,14 +69,13 @@ async def async_migrate_entry(
         if profiles and CONF_DEFAULT_VOICE not in options:
             options[CONF_DEFAULT_VOICE] = profiles[0].subentry_id
         hass.config_entries.async_update_entry(entry, options=options, minor_version=2)
-    return True
 
 
 async def async_unload_entry(
     hass: HomeAssistant, entry: XiaomiMimoTTSConfigEntry
-) -> bool:
+) -> None:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    await hass.config_entries.async_unload_platforms_or_raise(entry, PLATFORMS)
 
 
 async def _async_update_listener(

@@ -20,7 +20,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import EntityCategory, UnitOfInformation, UnitOfTime
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -302,6 +302,11 @@ class XiaomiMimoSensor(RestoreSensor):
         registered = self._entry.runtime_data.sensors_by_device.get(self._scope_id)
         if registered is not None and self in registered:
             registered.remove(self)
+
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep the sensor as it is: its registration is keyed by scope, not entity_id."""
+        super().async_entity_id_changed(old_entity_id)
 
     def handle_call(self, stats: TTSCallStats) -> None:
         desc = self.entity_description
